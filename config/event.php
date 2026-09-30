@@ -2,6 +2,8 @@
 /**
  * Konfiguration des Anlasses.
  *
+ * BEISPIEL: Generalversammlung. Für den Branch 'generalversammlung' nach config/event.php kopieren.
+ *
  * Dies ist die EINZIGE Datei, die pro Anlass (bzw. pro Branch) angepasst werden muss.
  * Beispiele für Weihnachtsessen und Generalversammlung liegen in config/beispiele/.
  */
@@ -22,15 +24,15 @@ return [
     // Anlass
     // ------------------------------------------------------------------
     'event' => [
-        'id'          => 'doc-bern-anlass',           // eindeutige Kennung (für Kalender)
-        'title'       => 'Clubanlass DOC Bern',
-        'subtitle'    => 'Melde dich jetzt an',
-        'date'        => '2026-12-05',                // JJJJ-MM-TT
-        'start'       => '18:00',
-        'end'         => '23:00',
-        'location'    => 'Ort folgt',
-        'address'     => '',
-        'description' => 'Wir freuen uns auf einen gemütlichen Abend mit dir.',
+        'id'          => 'doc-bern-generalversammlung',
+        'title'       => 'Generalversammlung 2026',
+        'subtitle'    => 'Ordentliche Generalversammlung des DOC Bern',
+        'date'        => '2026-12-05',                // TODO: effektives Datum eintragen
+        'start'       => '17:00',
+        'end'         => '19:00',
+        'location'    => 'Ort folgt',                 // TODO
+        'address'     => '',                          // TODO
+        'description' => 'Die Einladung mit Traktandenliste wird allen Mitgliedern separat zugestellt.',
     ],
 
     // Maximale Anzahl Personen (Erwachsene und Kinder zählen je als 1 Platz)
@@ -43,12 +45,12 @@ return [
     // Funktionen
     // ------------------------------------------------------------------
     'features' => [
-        'companion'    => true,   // weitere erwachsene Person (max. 1, ohne E-Mail)
-        'children'     => true,   // Kinder hinzufügen
-        'max_children' => 8,
-        'alt_menu'     => false,  // Menüwahl pro Person (Standard / Alternativ)
-        'payment'      => false,  // Kosten und TWINT QR Code anzeigen
-        'calendar'     => true,   // Kalendereintrag (.ics) anbieten
+        'companion'    => false,  // an der GV nur Mitglieder
+        'children'     => false,
+        'max_children' => 0,
+        'alt_menu'     => false,
+        'payment'      => false,
+        'calendar'     => true,
     ],
 
     // ------------------------------------------------------------------
@@ -56,7 +58,10 @@ return [
     // ------------------------------------------------------------------
 
     // Ablauf des Abends: ['time' => '17:00 bis 19:00', 'title' => '...', 'text' => '...']
-    'program' => [],
+    'program' => [
+        ['time' => '17:00 bis 19:00', 'title' => 'Generalversammlung DOC Bern'],
+        ['time' => 'ab 19:30',        'title' => 'DOC Weihnachtsessen', 'text' => 'Separate Anmeldung erforderlich'],
+    ],
 
     // Menü (nur relevant, wenn 'alt_menu' aktiv ist oder ein Menü angezeigt werden soll)
     'menu' => [
@@ -78,10 +83,10 @@ return [
 
     // Hinweis nach erfolgreicher Anmeldung (z.B. Verweis auf zweite Anmeldung)
     'notice_after_registration' => [
-        'title'      => '',
-        'text'       => '',
-        'link'       => '',
-        'link_label' => '',
+        'title'      => 'Nicht vergessen: Anmeldung zum Weihnachtsessen',
+        'text'       => 'Das Weihnachtsessen im Anschluss an die GV hat eine separate Anmeldung. Bitte melde dich dort ebenfalls an, falls du teilnimmst.',
+        'link'       => '',                             // TODO: URL der Anmeldung Weihnachtsessen
+        'link_label' => 'Zur Anmeldung Weihnachtsessen',
     ],
 
     // ------------------------------------------------------------------
@@ -112,7 +117,7 @@ return [
     // Darstellung
     // ------------------------------------------------------------------
     // Lädt zusätzlich assets/css/themes/<theme>.css (leer = Standarddesign)
-    'theme' => '',
+    'theme' => 'generalversammlung',
 
     // ------------------------------------------------------------------
     // Technik
