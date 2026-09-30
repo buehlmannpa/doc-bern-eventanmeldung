@@ -7,13 +7,15 @@ Läuft auf jedem Standard Webhosting mit PHP (z.B. Hostpoint), **ohne Datenbank 
 
 **Anmeldeseite**
 * Responsive Design für Smartphone und Laptop (Touch und Maus), Liquid Glass Look, Ducati Farben
+* Helles Design, automatisch dunkel gemäss Systemeinstellung des Geräts
 * Belegungsbalken mit Live Aktualisierung (alle 30 Sekunden)
 * Hauptperson mit Vor und Nachname sowie E-Mail
 * Optional eine weitere Person (ohne E-Mail) und beliebig viele Kinder
 * Optional Menüwahl pro Person (Standard oder Alternativ)
 * Limit (Standard 80 Personen, Erwachsene und Kinder zählen je als 1 Platz). Wer mehr Personen anmelden will als Plätze frei sind, erhält sofort eine Meldung und kann nicht absenden. Der Server prüft das zusätzlich unter Sperre, damit auch gleichzeitige Anmeldungen nie überbuchen.
 * Automatisches Schliessen, sobald das Limit erreicht ist
-* Kalendereintrag (.ics) zum Herunterladen
+* Kalendereintrag (.ics) zum Herunterladen nach erfolgreicher Anmeldung
+* Anmeldung funktioniert auch, wenn JavaScript blockiert ist (dann nur für die Hauptperson). Ein Hinweis erscheint in diesem Fall automatisch.
 * Optional Kosten und TWINT QR Code (bleibt immer sichtbar)
 * Optional Hinweis nach der Anmeldung (z.B. «Bitte auch für die GV anmelden»)
 * Bestätigungsmail von info@doc-bern.ch mit Personenliste, Betrag, TWINT QR Code und Kalendereintrag im Anhang
