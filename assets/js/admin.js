@@ -23,7 +23,7 @@
     const opts = body === undefined
       ? { cache: 'no-store' }
       : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cfg.csrf }, body: JSON.stringify(body) };
-    const res = await fetch(`api.php?action=${action}`, opts);
+    const res = await fetch(`${cfg.api}?action=${action}`, opts);
     if (res.status === 401) { location.reload(); throw new Error('Nicht angemeldet'); }
     const out = await res.json().catch(() => ({ ok: false, error: 'Unerwartete Antwort vom Server.' }));
     out.httpStatus = res.status;
@@ -262,7 +262,7 @@
         <div class="toolbar-actions">
           <button class="btn btn-primary" id="add-reg">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Anmeldung hinzufügen</button>
-          <a class="btn btn-glass" href="api.php?action=export&csrf=${encodeURIComponent(cfg.csrf)}">CSV Export</a>
+          <a class="btn btn-glass" href="${cfg.api}?action=export&csrf=${encodeURIComponent(cfg.csrf)}">CSV Export</a>
         </div>
         <div class="chips" role="group" aria-label="Filter">
           ${filters.map(([k, l]) => `<button class="chip" data-filter="${esc(k)}" aria-pressed="${view.filter === k}">${esc(l)}</button>`).join('')}

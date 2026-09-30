@@ -23,6 +23,32 @@ function cfg(string $key, $default = null)
     return $value;
 }
 
+/**
+ * Absoluter Pfad des Installationsordners, z.B. "/" oder "/test/".
+ * Wird automatisch ermittelt, damit die Seite in jedem Unterordner läuft.
+ */
+function base_path(): string
+{
+    static $base = null;
+    if ($base === null) {
+        $dir  = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+        $dir  = preg_replace('#/admin$#', '', rtrim($dir, '/'));
+        $base = $dir . '/';
+    }
+    return $base;
+}
+
+/** URL zu einer Datei im Installationsordner, mit Versionsparameter gegen veralteten Cache. */
+function asset_url(string $path): string
+{
+    $path = ltrim($path, '/');
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+    $mtime = @filemtime(APP_ROOT . '/' . $path);
+    return base_path() . $path . ($mtime ? '?v=' . $mtime : '');
+}
+
 function e($value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
