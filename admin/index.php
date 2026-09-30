@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Sitzung abgelaufen. Bitte erneut versuchen.';
     } elseif (isset($_POST['logout'])) {
         admin_logout();
-        header('Location: ./');
+        header('Location: ' . base_path() . 'admin/');
         exit;
     } elseif (!$hashConfigured && isset($_POST['new_password'])) {
         // Einrichtung: Hash erzeugen (wird NICHT gespeichert, sondern angezeigt)
@@ -34,13 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['password'])) {
         $error = admin_login((string) $_POST['password']) ?? '';
         if ($error === '') {
-            header('Location: ./');
+            header('Location: ' . base_path() . 'admin/');
             exit;
         }
     }
 }
 
-$asset = fn (string $p) => '../' . e($p) . '?v=' . (@filemtime(__DIR__ . '/../' . $p) ?: 1);
+$asset = fn (string $p) => e(asset_url($p));
+$base  = e(base_path());
 ?>
 <!doctype html>
 <html lang="de-CH">
@@ -50,7 +51,7 @@ $asset = fn (string $p) => '../' . e($p) . '?v=' . (@filemtime(__DIR__ . '/../' 
     <meta name="theme-color" content="#0e0e10">
     <meta name="robots" content="noindex, nofollow">
     <title>CMS | <?= e(cfg('event.title')) ?></title>
-    <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="<?= $asset('assets/img/favicon.svg') ?>" type="image/svg+xml">
     <link rel="stylesheet" href="<?= $asset('assets/css/base.css') ?>">
     <link rel="stylesheet" href="<?= $asset('assets/css/admin.css') ?>">
 </head>
@@ -86,7 +87,7 @@ $asset = fn (string $p) => '../' . e($p) . '?v=' . (@filemtime(__DIR__ . '/../' 
                 <button class="btn btn-primary btn-block">Anmelden</button>
             </form>
         <?php endif; ?>
-        <p class="small muted"><a href="../">Zur Anmeldeseite</a></p>
+        <p class="small muted"><a href="<?= $base ?>">Zur Anmeldeseite</a></p>
     </section>
 </main>
 
@@ -97,7 +98,7 @@ $asset = fn (string $p) => '../' . e($p) . '?v=' . (@filemtime(__DIR__ . '/../' 
         <div class="brand"><span class="brand-mark">DOC</span><span class="brand-text">CMS · <?= e(cfg('event.title')) ?></span></div>
         <div class="top-actions">
             <span class="status-pill" id="status-pill">…</span>
-            <a class="btn btn-glass btn-sm" href="../" target="_blank" rel="noopener">Seite ansehen</a>
+            <a class="btn btn-glass btn-sm" href="<?= $base ?>" target="_blank" rel="noopener">Seite ansehen</a>
             <form method="post">
                 <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
                 <button class="btn btn-glass btn-sm" name="logout" value="1">Abmelden</button>
@@ -123,6 +124,7 @@ $asset = fn (string $p) => '../' . e($p) . '?v=' . (@filemtime(__DIR__ . '/../' 
 
 <script type="application/json" id="admin-config"><?= json_encode([
     'csrf'     => csrf_token(),
+    'api'      => base_path() . 'admin/api.php',
     'features' => cfg('features'),
     'prices'   => cfg('prices'),
     'roles'    => cfg('roles', []),

@@ -169,7 +169,7 @@
 
   async function refreshStatus() {
     try {
-      const res = await fetch('api.php?action=status', { cache: 'no-store' });
+      const res = await fetch(`${cfg.base}api.php?action=status`, { cache: 'no-store' });
       if (res.ok) renderStatus(await res.json());
     } catch (_) { /* offline: nächster Versuch */ }
   }
@@ -242,7 +242,7 @@
     btn.textContent = 'Wird gesendet …';
 
     try {
-      const res = await fetch('api.php?action=register', {
+      const res = await fetch(`${cfg.base}api.php?action=register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

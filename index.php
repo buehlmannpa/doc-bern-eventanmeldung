@@ -20,7 +20,8 @@ $timeText = cfg('event.start') . ' bis ' . cfg('event.end') . ' Uhr';
 $twintQr  = (string) cfg('twint.qr', '');
 $pct      = $status['capacity'] > 0 ? min(100, round($status['taken'] / $status['capacity'] * 100)) : 100;
 $contact  = (string) cfg('club.contact_email', '');
-$asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?: 1);
+$asset    = fn (string $p) => e(asset_url($p));
+$base     = e(base_path());
 ?>
 <!doctype html>
 <html lang="de-CH">
@@ -30,7 +31,7 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
     <meta name="theme-color" content="#0e0e10">
     <meta name="robots" content="noindex">
     <title><?= e(cfg('event.title')) ?> | <?= e(cfg('club.short')) ?></title>
-    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="<?= $asset('assets/img/favicon.svg') ?>" type="image/svg+xml">
     <link rel="stylesheet" href="<?= $asset('assets/css/base.css') ?>">
     <?php if ($theme && is_file(__DIR__ . "/assets/css/themes/$theme.css")): ?>
         <link rel="stylesheet" href="<?= $asset("assets/css/themes/$theme.css") ?>">
@@ -41,9 +42,9 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
 
 <header class="topbar">
     <div class="wrap topbar-inner">
-        <a class="brand" href="./">
+        <a class="brand" href="<?= $base ?>">
             <?php if (cfg('club.logo')): ?>
-                <img src="<?= e(cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo">
+                <img src="<?= $asset((string) cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo">
             <?php else: ?>
                 <span class="brand-mark" aria-hidden="true">DOC</span>
                 <span class="brand-text"><?= e(cfg('club.name')) ?></span>
@@ -68,7 +69,7 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
         <div class="hero-actions">
             <a href="#anmeldung" class="btn btn-primary">Jetzt anmelden</a>
             <?php if ($f['calendar']): ?>
-                <a href="calendar.php" class="btn btn-glass" download>
+                <a href="<?= $base ?>calendar.php" class="btn btn-glass" download>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>
                     In Kalender eintragen
                 </a>
@@ -142,7 +143,7 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
             </div>
             <?php if ($twintQr): ?>
                 <figure class="qr">
-                    <img src="<?= e($twintQr) ?>" alt="TWINT QR Code für die Bezahlung" width="220" height="220">
+                    <img src="<?= $asset($twintQr) ?>" alt="TWINT QR Code für die Bezahlung" width="220" height="220">
                     <figcaption>TWINT</figcaption>
                 </figure>
             <?php endif; ?>
@@ -235,7 +236,7 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
                 <div class="success-pay">
                     <p>Zu bezahlen: <strong id="success-total"></strong></p>
                     <?php if ($twintQr): ?>
-                        <img src="<?= e($twintQr) ?>" alt="TWINT QR Code für die Bezahlung" width="200" height="200">
+                        <img src="<?= $asset($twintQr) ?>" alt="TWINT QR Code für die Bezahlung" width="200" height="200">
                     <?php endif; ?>
                     <p class="muted small">Der QR Code bleibt oben unter «Kosten und Bezahlung» jederzeit verfügbar.</p>
                 </div>
@@ -255,7 +256,7 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
 
             <div class="hero-actions center">
                 <?php if ($f['calendar']): ?>
-                    <a href="calendar.php" class="btn btn-glass" download>
+                    <a href="<?= $base ?>calendar.php" class="btn btn-glass" download>
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>
                         Kalendereintrag herunterladen
                     </a>
@@ -269,7 +270,7 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
     <p>© <?= date('Y') ?> <?= e(cfg('club.name')) ?><?php if (cfg('club.contact_email')): ?> · <a href="mailto:<?= e(cfg('club.contact_email')) ?>"><?= e(cfg('club.contact_email')) ?></a><?php endif; ?></p>
 </footer>
 
-<script type="application/json" id="app-config"><?= json_encode(public_config() + ['status' => $status], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
+<script type="application/json" id="app-config"><?= json_encode(public_config() + ['status' => $status, 'base' => base_path()], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <script src="<?= $asset('assets/js/app.js') ?>"></script>
 </body>
 </html>
