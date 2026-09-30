@@ -1,0 +1,26 @@
+# DOC Bern Eventanmeldung
+# Diese Datei ist optional. Sie funktioniert auf Hostpoint (Apache) ohne weitere Konfiguration.
+
+Options -Indexes
+DirectoryIndex index.php
+
+# Versteckte Dateien und Markdown nicht ausliefern
+<FilesMatch "(^\.|\.(md|json|lock|tmp)$)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Immer HTTPS verwenden (Hostpoint stellt kostenlose SSL Zertifikate bereit)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+AddType text/calendar .ics

@@ -1,0 +1,4 @@
+# Anmeldedaten nie ins Repository
+data/*
+!data/.htaccess
+!data/index.html
