@@ -19,6 +19,7 @@ $theme    = preg_replace('/[^a-z0-9\-]/i', '', (string) cfg('theme', ''));
 $timeText = cfg('event.start') . ' bis ' . cfg('event.end') . ' Uhr';
 $twintQr  = (string) cfg('twint.qr', '');
 $pct      = $status['capacity'] > 0 ? min(100, round($status['taken'] / $status['capacity'] * 100)) : 100;
+$contact  = (string) cfg('club.contact_email', '');
 $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?: 1);
 ?>
 <!doctype html>
@@ -218,6 +219,8 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
             <div class="alert alert-error" id="form-error" role="alert" hidden></div>
 
             <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Verbindlich anmelden</button>
+
+            <p class="muted small center-text">Bereits angemeldet? Änderungen oder Abmeldungen bitte mit dem Vorstand besprechen<?php if ($contact): ?>: <a href="mailto:<?= e($contact) ?>"><?= e($contact) ?></a><?php else: ?>.<?php endif; ?></p>
         </form>
 
         <div id="success" class="success" hidden tabindex="-1">
@@ -225,6 +228,7 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
                 <svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
             </div>
             <h2>Vielen Dank für deine Anmeldung!</h2>
+            <p class="muted" id="mail-info" hidden></p>
             <p class="muted">Folgende Personen sind angemeldet:</p>
             <ul class="success-list" id="success-list"></ul>
             <?php if ($f['payment']): ?>
@@ -246,6 +250,8 @@ $asset    = fn (string $p) => e($p) . '?v=' . (@filemtime(__DIR__ . '/' . $p) ?:
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
+
+            <p class="muted small">Änderungen oder Abmeldungen bitte mit dem Vorstand besprechen<?php if ($contact): ?>: <a href="mailto:<?= e($contact) ?>"><?= e($contact) ?></a><?php else: ?>.<?php endif; ?></p>
 
             <div class="hero-actions center">
                 <?php if ($f['calendar']): ?>

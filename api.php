@@ -6,6 +6,7 @@
  */
 declare(strict_types=1);
 require __DIR__ . '/lib/bootstrap.php';
+require __DIR__ . '/lib/mail.php';
 
 $action = $_GET['action'] ?? 'status';
 
@@ -50,7 +51,13 @@ try {
             }
             foreach ($list as $r) {
                 if (($r['email'] ?? '') === $reg['email']) {
-                    return ['error' => 'Mit dieser E-Mail Adresse besteht bereits eine Anmeldung. Für Änderungen melde dich bitte beim Vorstand.', 'code' => 409, 'fields' => ['email' => 'Bereits angemeldet.']];
+                    $contact = (string) cfg('club.contact_email', '');
+                    return [
+                        'error'     => 'Du bist bereits angemeldet. Änderungen an deiner Anmeldung bitte mit dem Vorstand besprechen' . ($contact ? " ($contact)." : '.'),
+                        'code'      => 409,
+                        'duplicate' => true,
+                        'fields'    => ['email' => 'Bereits angemeldet.'],
+                    ];
                 }
             }
             $needed = count($reg['persons']);
@@ -81,8 +88,19 @@ try {
         }
 
         $reg = $result['reg'];
+
+        // Bestätigungsmail (ein Fehler beim Versand macht die Anmeldung nicht ungültig)
+        $mailSent = false;
+        if (mail_enabled()) {
+            $mailSent = send_confirmation($reg);
+            if ($mailSent) {
+                mark_mailed(store(), $reg['id']);
+            }
+        }
+
         json_response([
-            'ok'      => true,
+            'ok'       => true,
+            'mailSent' => $mailSent,
             'status'  => $result['status'],
             'summary' => [
                 'email'   => $reg['email'],

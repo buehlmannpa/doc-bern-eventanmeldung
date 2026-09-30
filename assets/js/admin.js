@@ -288,6 +288,14 @@
     $('#add-reg', el).addEventListener('click', () => openEditor(null));
     $$('[data-edit]', el).forEach((b) => b.addEventListener('click', () => openEditor(data.registrations.find((r) => r.id === b.dataset.edit))));
     $$('[data-delete]', el).forEach((b) => b.addEventListener('click', () => deleteReg(b.dataset.delete)));
+    $$('[data-mail]', el).forEach((b) => b.addEventListener('click', async () => {
+      const r = data.registrations.find((x) => x.id === b.dataset.mail);
+      if (!confirm(`Bestätigung an ${r.email} ${r.mailed_at ? 'erneut ' : ''}senden?`)) return;
+      b.disabled = true;
+      const out = await api('mail', { id: r.id });
+      b.disabled = false;
+      toast(out.ok ? `Bestätigung an ${r.email} gesendet.` : out.error, !out.ok);
+    }));
     $$('[data-paid]', el).forEach((c) => c.addEventListener('change', async () => {
       const out = await api('paid', { id: c.dataset.paid, paid: c.checked });
       if (!out.ok) toast(out.error, true);
@@ -314,8 +322,11 @@
           <div>
             <h3>${esc(main.first)} ${esc(main.last)}</h3>
             <p class="muted small">${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a> · ` : ''}${fmtDate(r.created_at)}${r.source === 'admin' ? ' · <span class="tag">manuell</span>' : ''}</p>
+            ${data.mailEnabled && r.email ? `<p class="muted small mail-state">${r.mailed_at ? `✓ Bestätigung gesendet ${fmtDate(r.mailed_at)}` : 'Keine Bestätigung gesendet'}</p>` : ''}
           </div>
           <div class="reg-actions">
+            ${data.mailEnabled && r.email ? `<button class="icon-btn" data-mail="${esc(r.id)}" aria-label="Bestätigung erneut senden" title="Bestätigung erneut senden">
+              <svg viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg></button>` : ''}
             <button class="icon-btn" data-edit="${esc(r.id)}" aria-label="Bearbeiten" title="Bearbeiten">
               <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m14 6 4 4"/></svg></button>
             <button class="icon-btn danger" data-delete="${esc(r.id)}" aria-label="Löschen" title="Löschen">
@@ -356,6 +367,7 @@
       email: reg?.email || '',
       paid: !!reg?.paid,
       notes: reg?.notes || '',
+      sendMail: !reg,
       main: reg?.persons.find((p) => p.relation === 'main') || { first: '', last: '', menu: 'standard', role: '' },
       companion: reg?.persons.find((p) => p.relation === 'companion') || null,
       children: reg?.persons.filter((p) => p.relation === 'child') || [],
@@ -386,6 +398,7 @@
       model.email = get('email');
       model.notes = get('notes');
       model.paid = !!form.elements.paid?.checked;
+      model.sendMail = !!form.elements.sendMail?.checked;
       model.main = person('main');
       if (model.companion) model.companion = person('companion');
       model.children = model.children.map((_, i) => person(`child${i}`));
@@ -408,6 +421,7 @@
               ${f.children ? '<button type="button" class="btn btn-glass" data-add="child">+ Kind</button>' : ''}
             </div>
             ${f.payment ? `<label class="switch"><input type="checkbox" name="paid" ${model.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : ''}
+            ${data.mailEnabled ? `<label class="switch"><input type="checkbox" name="sendMail" ${model.sendMail ? 'checked' : ''}><span></span>${model.id ? 'Bestätigung erneut senden' : 'Bestätigung per E-Mail senden'}</label>` : ''}
             <label class="field"><span>Notiz (nur intern)</span><textarea name="notes" maxlength="500">${esc(model.notes)}</textarea></label>
             <div class="alert alert-error" data-error hidden></div>
           </div>
@@ -441,10 +455,11 @@
         id: model.id, email: model.email, paid: model.paid, notes: model.notes,
         main: model.main, companion: model.companion, children: model.children,
       };
-      const out = await api('save', { registration: payload, force });
+      const out = await api('save', { registration: payload, force, sendMail: model.sendMail && !!model.email });
       if (out.ok) {
         dlg.close();
-        toast('Gespeichert.');
+        if (out.mailSent === false) toast('Gespeichert, aber die Bestätigung konnte nicht versendet werden.', true);
+        else toast(out.mailSent ? 'Gespeichert und Bestätigung gesendet.' : 'Gespeichert.');
         return;
       }
       if (out.needsForce && confirm(out.error)) {

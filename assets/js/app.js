@@ -258,7 +258,7 @@
         errEl.hidden = false;
         return;
       }
-      showSuccess(out.summary);
+      showSuccess(out.summary, out.mailSent);
     } catch (_) {
       const errEl = $('#form-error');
       errEl.textContent = 'Keine Verbindung zum Server. Bitte versuche es erneut.';
@@ -270,7 +270,12 @@
     }
   });
 
-  function showSuccess(summary) {
+  function showSuccess(summary, mailSent) {
+    const info = $('#mail-info');
+    if (mailSent) {
+      info.textContent = `Eine Bestätigung wurde an ${summary.email} gesendet. Bitte prüfe allenfalls auch den Spamordner.`;
+      info.hidden = false;
+    }
     const list = $('#success-list');
     list.innerHTML = summary.persons.map((p) => `
       <li>

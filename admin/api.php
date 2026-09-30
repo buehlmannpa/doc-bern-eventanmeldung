@@ -5,6 +5,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/auth.php';
+require __DIR__ . '/../lib/mail.php';
 
 admin_session_start();
 
@@ -32,6 +33,7 @@ function snapshot(Store $s): array
         'status'        => registration_status($list, $s->state()),
         'state'         => $s->state(),
         'defaultCap'    => (int) cfg('capacity', 80),
+        'mailEnabled'   => mail_enabled(),
     ];
 }
 
@@ -142,22 +144,49 @@ try {
             }
 
             if ($idx === null) {
-                $list[] = array_merge([
+                $list[] = $saved = array_merge([
                     'id'         => random_id(8),
                     'created_at' => date('c'),
                     'source'     => 'admin',
                 ], $reg, ['updated_at' => date('c')]);
             } else {
-                $list[$idx] = array_merge($list[$idx], $reg, ['updated_at' => date('c')]);
+                $list[$idx] = $saved = array_merge($list[$idx], $reg, ['updated_at' => date('c')]);
             }
             $s->saveRegistrations($list);
-            return [];
+            return ['reg' => $saved];
         });
 
         if (isset($result['error'])) {
             json_response(['ok' => false] + $result, $result['code']);
         }
-        json_response(snapshot($store));
+
+        $mailSent = null;
+        if (!empty($in['sendMail']) && $result['reg']['email'] !== '') {
+            $mailSent = send_confirmation($result['reg']);
+            if ($mailSent) {
+                mark_mailed($store, $result['reg']['id']);
+            }
+        }
+        json_response(snapshot($store) + ['mailSent' => $mailSent]);
+    }
+
+    // --- Bestätigung erneut senden -------------------------------------------
+    if ($action === 'mail') {
+        $id  = (string) ($in['id'] ?? '');
+        $reg = null;
+        foreach ($store->registrations() as $r) {
+            if (($r['id'] ?? '') === $id) {
+                $reg = $r;
+            }
+        }
+        if (!$reg || empty($reg['email'])) {
+            json_response(['ok' => false, 'error' => 'Für diese Anmeldung ist keine E-Mail Adresse erfasst.'], 422);
+        }
+        if (!send_confirmation($reg)) {
+            json_response(['ok' => false, 'error' => 'Die Mail konnte nicht versendet werden. Bitte Mail Konfiguration prüfen.'], 500);
+        }
+        mark_mailed($store, $id);
+        json_response(snapshot($store) + ['mailSent' => true]);
     }
 
     // --- Löschen --------------------------------------------------------------

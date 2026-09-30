@@ -16,6 +16,8 @@ Läuft auf jedem Standard Webhosting mit PHP (z.B. Hostpoint), **ohne Datenbank 
 * Kalendereintrag (.ics) zum Herunterladen
 * Optional Kosten und TWINT QR Code (bleibt immer sichtbar)
 * Optional Hinweis nach der Anmeldung (z.B. «Bitte auch für die GV anmelden»)
+* Bestätigungsmail von info@doc-bern.ch mit Personenliste, Betrag, TWINT QR Code und Kalendereintrag im Anhang
+* Mehrfachanmeldung mit derselben E-Mail ist gesperrt: «Du bist bereits angemeldet. Änderungen an deiner Anmeldung bitte mit dem Vorstand besprechen.»
 
 **CMS** (`/admin`)
 * Passwortgeschützt, Sperre nach 5 Fehlversuchen, CSRF Schutz
@@ -26,6 +28,7 @@ Läuft auf jedem Standard Webhosting mit PHP (z.B. Hostpoint), **ohne Datenbank 
 * Anmeldung manuell schliessen («ausgebucht») oder pausieren («Wir sind gleich zurück»), mit eigenem Text
 * Limit im CMS übersteuerbar
 * CSV Export für Excel
+* Bestätigungsmail beim manuellen Hinzufügen senden oder jederzeit erneut senden
 
 ## Aufbau
 
@@ -64,6 +67,18 @@ Neuen Branch vorbereiten: Beispieldatei nach `config/event.php` kopieren und die
 6. Optional ein Logo nach `assets/img/` hochladen und bei `club.logo` eintragen.
 
 PHP Version: 8.0 oder neuer (bei Hostpoint Standard).
+
+## Bestätigungsmail
+
+Der Versand läuft über die Mailfunktion des Hostpoint Webservers. Es muss **kein Passwort** hinterlegt werden.
+
+* Absender ist `info@doc-bern.ch` (Einstellung `mail` in `config/event.php`). Die Adresse muss als Mailbox bei Hostpoint existieren und die Domain doc-bern.ch muss bei Hostpoint liegen. Nur so erkennen die Empfänger die Mail als echt (SPF) und sie landet nicht im Spam.
+* Antworten auf die Bestätigung gehen an `reply_to` (Standard info@doc-bern.ch).
+* Mit `bcc` erhält der Vorstand eine Kopie jeder Bestätigung.
+* Der TWINT QR Code wird nur als PNG oder JPG in die Mail eingebettet (SVG zeigen viele Mailprogramme nicht an).
+* Schlägt der Versand fehl, bleibt die Anmeldung trotzdem gültig. Im CMS ist sichtbar, ob und wann eine Bestätigung gesendet wurde.
+* Ausschalten: `'enabled' => false`.
+* **Tipp für den ersten Test:** eine Anmeldung mit der eigenen Adresse machen und prüfen, ob die Mail ankommt. Danach im CMS löschen.
 
 ## Datenspeicherung und Sicherheit
 

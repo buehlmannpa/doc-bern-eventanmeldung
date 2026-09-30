@@ -78,6 +78,8 @@ p { margin: 0 0 1em; }
 
 .muted { color: var(--text-2); }
 .small { font-size: .875rem; }
+.center-text { text-align: center; margin: 0; }
+.muted a { color: var(--text); }
 
 /* --- Hintergrund ------------------------------------------------------- */
 

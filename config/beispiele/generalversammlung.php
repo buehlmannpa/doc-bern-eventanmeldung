@@ -16,7 +16,7 @@ return [
         'name'          => 'Ducati Owners Club Bern',
         'short'         => 'DOC Bern',
         'logo'          => '',                        // z.B. 'assets/img/logo.svg' (leer = Textlogo)
-        'contact_email' => 'info@example.ch',         // wird bei Fehlern und im Footer angezeigt
+        'contact_email' => 'info@doc-bern.ch',        // Kontakt für Fragen und Änderungen
         'website'       => '',
     ],
 
@@ -88,6 +88,22 @@ return [
         'link'       => '',                             // TODO: URL der Anmeldung Weihnachtsessen
         'link_label' => 'Zur Anmeldung Weihnachtsessen',
     ],
+
+    // ------------------------------------------------------------------
+    // Bestätigungsmail
+    // ------------------------------------------------------------------
+    // Versand über den Webserver (PHP mail()), bei Hostpoint ohne Einrichtung möglich.
+    // Absender muss eine Adresse der eigenen Domain sein, die bei Hostpoint läuft.
+    'mail' => [
+        'enabled'   => true,
+        'from'      => 'info@doc-bern.ch',
+        'from_name' => 'Ducati Owners Club Bern',
+        'reply_to'  => 'info@doc-bern.ch',            // Antworten auf die Bestätigung landen hier
+        'bcc'       => '',                            // optional Kopie jeder Bestätigung, z.B. 'info@doc-bern.ch'
+    ],
+
+    // Öffentliche Adresse der Anmeldeseite (leer = automatisch erkennen)
+    'site_url' => '',
 
     // ------------------------------------------------------------------
     // Rollen im CMS (farbliche Kennzeichnung, 'free' = bezahlt nichts)
