@@ -6,6 +6,7 @@ declare(strict_types=1);
 require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/auth.php';
 require __DIR__ . '/../lib/mail.php';
+require __DIR__ . '/../lib/xlsx.php';
 
 admin_session_start();
 
@@ -53,6 +54,121 @@ try {
     // --- Lesen --------------------------------------------------------------
     if ($action === 'list' && $method === 'GET') {
         json_response(snapshot($store));
+    }
+
+    // --- Excel Export (.xlsx mit Übersicht, Personen und Anmeldungen) -------
+    if ($action === 'excel' && $method === 'GET') {
+        if (!csrf_valid($_GET['csrf'] ?? null)) {
+            http_response_code(403);
+            exit('Sitzung abgelaufen.');
+        }
+        $f       = cfg('features');
+        $roles   = cfg('roles', []);
+        $list    = $store->registrations();
+        usort($list, fn ($a, $b) => strcmp($a['created_at'], $b['created_at']));
+        $status  = registration_status($list, $store->state());
+        $relName = ['main' => 'Hauptperson', 'companion' => 'Weitere Person', 'child' => 'Kind'];
+        $menu    = fn ($m) => (string) cfg("menu.$m.label", $m);
+        $date    = fn ($iso) => $iso ? date('d.m.Y H:i', strtotime($iso)) : '';
+
+        // Tabelle Personen
+        $pHead = ['Nr.', 'Angemeldet am', 'Vorname', 'Nachname', 'E-Mail', 'Art', 'Rolle'];
+        $pW    = [6, 17, 16, 18, 28, 16, 15];
+        if ($f['alt_menu']) { $pHead[] = 'Menü'; $pW[] = 20; }
+        if ($f['payment'])  { $pHead[] = 'Betrag'; $pW[] = 11; $pHead[] = 'Bezahlt'; $pW[] = 9; }
+        $pHead[] = 'Notiz'; $pW[] = 30;
+        $pRows = []; $pStyles = [];
+
+        // Tabelle Anmeldungen
+        $gHead = ['Nr.', 'Angemeldet am', 'Hauptperson', 'E-Mail', 'Personen', 'Erwachsene', 'Kinder'];
+        $gW    = [6, 17, 24, 28, 10, 11, 8];
+        if ($f['payment']) { $gHead[] = 'Betrag'; $gW[] = 11; $gHead[] = 'Bezahlt'; $gW[] = 9; }
+        if (mail_enabled()) { $gHead[] = 'Bestätigung gesendet'; $gW[] = 20; }
+        $gHead[] = 'Quelle'; $gW[] = 10;
+        $gHead[] = 'Notiz'; $gW[] = 30;
+        $gRows = [];
+
+        $sum = ['adults' => 0, 'children' => 0, 'alt' => 0, 'total' => 0.0, 'paid' => 0.0];
+        $roleCount = array_fill_keys(array_keys($roles), 0);
+
+        foreach ($list as $i => $r) {
+            $nr     = $i + 1;
+            $adults = count(array_filter($r['persons'], fn ($p) => $p['type'] === 'adult'));
+            $kids   = count($r['persons']) - $adults;
+            $total  = registration_total($r);
+            $paid   = !empty($r['paid']);
+            $sum['adults'] += $adults; $sum['children'] += $kids; $sum['total'] += $total;
+            if ($paid) { $sum['paid'] += $total; }
+
+            foreach ($r['persons'] as $p) {
+                $row = [$nr, $date($r['created_at']), $p['first'], $p['last'], $p['relation'] === 'main' ? $r['email'] : '',
+                        $relName[$p['relation']] ?? '', $roles[$p['role']]['label'] ?? ''];
+                if ($f['alt_menu']) { $row[] = $menu($p['menu']); }
+                if ($f['payment'])  { $row[] = ['money' => price_for($p)]; $row[] = $paid ? 'ja' : 'nein'; }
+                $row[] = $p['relation'] === 'main' ? ($r['notes'] ?? '') : '';
+                $pRows[]   = $row;
+                $pStyles[] = $p['role'] !== '' && isset($roles[$p['role']]) ? $p['role'] : null;
+                if ($p['menu'] === 'alternative') { $sum['alt']++; }
+                if (isset($roleCount[$p['role']])) { $roleCount[$p['role']]++; }
+            }
+
+            $main = $r['persons'][0];
+            $row  = [$nr, $date($r['created_at']), $main['first'] . ' ' . $main['last'], $r['email'], count($r['persons']), $adults, $kids];
+            if ($f['payment']) { $row[] = ['money' => $total]; $row[] = $paid ? 'ja' : 'nein'; }
+            if (mail_enabled()) { $row[] = $date($r['mailed_at'] ?? ''); }
+            $row[] = ($r['source'] ?? 'web') === 'admin' ? 'manuell' : 'Website';
+            $row[] = $r['notes'] ?? '';
+            $gRows[] = $row;
+        }
+
+        // Tabelle Übersicht
+        $ov = [
+            [['title' => cfg('club.name') . ': ' . cfg('event.title')]],
+            ['Stand', date('d.m.Y H:i')],
+            ['Datum Anlass', format_date_long((string) cfg('event.date'))],
+            [],
+            ['Belegte Plätze', $status['taken']],
+            ['Maximale Plätze', $status['capacity']],
+            ['Freie Plätze', $status['remaining']],
+            ['Anmeldungen (Gruppen)', count($list)],
+            ['Erwachsene', $sum['adults']],
+            ['Kinder', $sum['children']],
+        ];
+        if ($f['alt_menu']) {
+            $ov[] = [$menu('standard'), $status['taken'] - $sum['alt']];
+            $ov[] = [$menu('alternative'), $sum['alt']];
+        }
+        foreach ($roles as $k => $role) {
+            $ov[] = [$role['label'] . ($role['free'] ? ' (kostenlos)' : ''), $roleCount[$k]];
+        }
+        if ($f['payment']) {
+            $ov[] = [];
+            $ov[] = ['Betrag total', ['money' => $sum['total']]];
+            $ov[] = ['Bezahlt', ['money' => $sum['paid']]];
+            $ov[] = ['Offen', ['money' => $sum['total'] - $sum['paid']]];
+        }
+
+        $fills = [];
+        foreach ($roles as $k => $role) {
+            // Rollenfarbe aufgehellt, damit der Text gut lesbar bleibt
+            $hex = ltrim((string) $role['color'], '#');
+            $rgb = array_map('hexdec', str_split(strlen($hex) === 3 ? preg_replace('/(.)/', '$1$1', $hex) : $hex, 2));
+            $fills[$k] = vsprintf('%02X%02X%02X', array_map(fn ($c) => (int) round($c + (255 - $c) * 0.65), $rgb));
+        }
+
+        $xlsx = (new XlsxWriter($fills))->build([
+            ['name' => 'Übersicht',   'widths' => [28, 22], 'rows' => $ov],
+            ['name' => 'Personen',    'widths' => $pW, 'header' => $pHead, 'rows' => $pRows, 'styles' => $pStyles],
+            ['name' => 'Anmeldungen', 'widths' => $gW, 'header' => $gHead, 'rows' => $gRows],
+        ]);
+
+        $name = preg_replace('/[^a-z0-9\-]/i', '-', (string) cfg('event.id')) . '-' . date('Y-m-d') . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $name . '"');
+        header('Content-Length: ' . strlen($xlsx));
+        header('Cache-Control: no-store');
+        echo $xlsx;
+        exit;
     }
 
     // --- CSV Export (eine Zeile pro Person, Excel tauglich) -----------------

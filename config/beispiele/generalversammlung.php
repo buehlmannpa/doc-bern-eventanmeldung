@@ -15,7 +15,7 @@ return [
     'club' => [
         'name'          => 'Ducati Owners Club Bern',
         'short'         => 'DOC Bern',
-        'logo'          => '',                        // z.B. 'assets/img/logo.svg' (leer = Textlogo)
+        'logo'          => '',                        // TODO: z.B. 'assets/img/logo.png' (oben links, 5x klicken = Admin Login; leer = Textlogo «DOC»)
         'contact_email' => 'info@doc-bern.ch',        // Kontakt für Fragen und Änderungen
         'website'       => '',
     ],
@@ -77,7 +77,7 @@ return [
     ],
 
     'twint' => [
-        'qr'   => 'assets/img/twint-qr.svg',          // eigenes Bild hier ablegen (PNG, JPG oder SVG)
+        'qr'   => 'assets/img/twint-qr.svg',          // TODO: eigenen QR Code als PNG hochladen und z.B. 'assets/img/twint-qr.png' eintragen (PNG/JPG nötig für die Mail)
         'note' => 'Bitte bei der Zahlung Vor und Nachname angeben.',
     ],
 
