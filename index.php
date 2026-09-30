@@ -62,7 +62,7 @@ $base     = e(base_path());
 
 <header class="topbar">
     <div class="wrap topbar-inner">
-        <a class="brand" href="<?= $base ?>">
+        <a class="brand" id="brand" href="<?= $base ?>" data-admin="<?= $base ?>admin/">
             <?php if (cfg('club.logo')): ?>
                 <img src="<?= $asset((string) cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo">
             <?php else: ?>

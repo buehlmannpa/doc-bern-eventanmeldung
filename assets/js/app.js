@@ -12,6 +12,29 @@ window.addEventListener('error', (ev) => {
 (() => {
   'use strict';
 
+  // Easter Egg: 5x auf das Club Logo klicken öffnet das Login zum Admin Portal
+  const brand = document.getElementById('brand');
+  if (brand) {
+    let clicks = 0;
+    let timer = null;
+    brand.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      clicks++;
+      clearTimeout(timer);
+      brand.classList.remove('tap');
+      void brand.offsetWidth; // Animation neu starten
+      brand.classList.add('tap');
+      if (clicks >= 5) {
+        location.href = brand.dataset.admin;
+        return;
+      }
+      timer = setTimeout(() => {
+        if (clicks === 1) window.scrollTo({ top: 0, behavior: 'smooth' });
+        clicks = 0;
+      }, 1500);
+    });
+  }
+
   const cfg = JSON.parse(document.getElementById('app-config').textContent);
   const f = cfg.features;
   const form = document.getElementById('reg-form');

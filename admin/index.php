@@ -64,7 +64,7 @@ $base  = e(base_path());
 
 <main class="wrap login-wrap">
     <section class="glass login-card">
-        <div class="brand"><span class="brand-mark">DOC</span><span class="brand-text">CMS <?= e(cfg('club.short')) ?></span></div>
+        <div class="brand"><?php if (cfg('club.logo')): ?><img src="<?= $asset((string) cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo"><?php else: ?><span class="brand-mark">DOC</span><?php endif; ?><span class="brand-text">CMS <?= e(cfg('club.short')) ?></span></div>
         <h1><?= e(cfg('event.title')) ?></h1>
 
         <?php if ($error): ?><div class="alert alert-error" role="alert"><?= e($error) ?></div><?php endif; ?>
@@ -97,7 +97,7 @@ $base  = e(base_path());
 
 <header class="topbar">
     <div class="wrap wrap-wide topbar-inner">
-        <div class="brand"><span class="brand-mark">DOC</span><span class="brand-text">CMS · <?= e(cfg('event.title')) ?></span></div>
+        <div class="brand"><?php if (cfg('club.logo')): ?><img src="<?= $asset((string) cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo"><?php else: ?><span class="brand-mark">DOC</span><?php endif; ?><span class="brand-text">CMS · <?= e(cfg('event.title')) ?></span></div>
         <div class="top-actions">
             <span class="status-pill" id="status-pill">…</span>
             <a class="btn btn-glass btn-sm" href="<?= $base ?>" target="_blank" rel="noopener">Seite ansehen</a>

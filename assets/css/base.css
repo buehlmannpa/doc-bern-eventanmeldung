@@ -213,6 +213,9 @@ main.wrap { display: grid; gap: 20px; padding-bottom: 40px; }
 }
 .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 650; }
+#brand { -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+#brand.tap .brand-mark, #brand.tap .brand-logo { animation: brand-tap .25s ease; }
+@keyframes brand-tap { 50% { transform: scale(.92); } }
 .brand-mark {
   display: inline-grid; place-items: center;
   height: 36px; padding: 0 10px; border-radius: 10px;
