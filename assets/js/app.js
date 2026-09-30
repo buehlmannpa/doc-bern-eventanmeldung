@@ -1,4 +1,14 @@
 /* Anmeldeseite DOC Bern */
+// Falls beim Start etwas schiefgeht: Fehler im Hinweisfeld anzeigen (hilft bei der Fehlersuche)
+window.addEventListener('error', (ev) => {
+  const w = document.getElementById('js-warning');
+  if (!w) return;
+  w.classList.add('is-visible');
+  const d = document.createElement('small');
+  d.textContent = `Technischer Hinweis: ${ev.message}`;
+  w.appendChild(d);
+});
+
 (() => {
   'use strict';
 
@@ -295,4 +305,7 @@
   }
 
   update();
+
+  // Start erfolgreich: Hinweis entfernen
+  document.getElementById('js-warning')?.remove();
 })();

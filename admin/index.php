@@ -48,7 +48,9 @@ $base  = e(base_path());
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0e0e10">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0e0e10" media="(prefers-color-scheme: dark)">
     <meta name="robots" content="noindex, nofollow">
     <title>CMS | <?= e(cfg('event.title')) ?></title>
     <link rel="icon" href="<?= $asset('assets/img/favicon.svg') ?>" type="image/svg+xml">
