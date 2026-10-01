@@ -48,10 +48,12 @@ $base  = e(base_path());
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0e0e10">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0e0e10" media="(prefers-color-scheme: dark)">
     <meta name="robots" content="noindex, nofollow">
     <title>CMS | <?= e(cfg('event.title')) ?></title>
-    <link rel="icon" href="<?= $asset('assets/img/favicon.svg') ?>" type="image/svg+xml">
+    <?= favicon_tag() ?>
     <link rel="stylesheet" href="<?= $asset('assets/css/base.css') ?>">
     <link rel="stylesheet" href="<?= $asset('assets/css/admin.css') ?>">
 </head>
@@ -62,7 +64,7 @@ $base  = e(base_path());
 
 <main class="wrap login-wrap">
     <section class="glass login-card">
-        <div class="brand"><span class="brand-mark">DOC</span><span class="brand-text">CMS <?= e(cfg('club.short')) ?></span></div>
+        <div class="brand"><?php if (cfg('club.logo')): ?><img src="<?= $asset((string) cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo"><?php else: ?><span class="brand-mark">DOC</span><?php endif; ?><span class="brand-text">CMS <?= e(cfg('club.short')) ?></span></div>
         <h1><?= e(cfg('event.title')) ?></h1>
 
         <?php if ($error): ?><div class="alert alert-error" role="alert"><?= e($error) ?></div><?php endif; ?>
@@ -95,7 +97,7 @@ $base  = e(base_path());
 
 <header class="topbar">
     <div class="wrap wrap-wide topbar-inner">
-        <div class="brand"><span class="brand-mark">DOC</span><span class="brand-text">CMS · <?= e(cfg('event.title')) ?></span></div>
+        <div class="brand"><?php if (cfg('club.logo')): ?><img src="<?= $asset((string) cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo"><?php else: ?><span class="brand-mark">DOC</span><?php endif; ?><span class="brand-text">CMS · <?= e(cfg('event.title')) ?></span></div>
         <div class="top-actions">
             <span class="status-pill" id="status-pill">…</span>
             <a class="btn btn-glass btn-sm" href="<?= $base ?>" target="_blank" rel="noopener">Seite ansehen</a>

@@ -1,8 +1,55 @@
 /* Anmeldeseite DOC Bern */
+// Falls beim Start etwas schiefgeht: Fehler im Hinweisfeld anzeigen (hilft bei der Fehlersuche)
+window.addEventListener('error', (ev) => {
+  const w = document.getElementById('js-warning');
+  if (!w) return;
+  w.classList.add('is-visible');
+  const d = document.createElement('small');
+  d.textContent = `Technischer Hinweis: ${ev.message}`;
+  w.appendChild(d);
+});
+
 (() => {
   'use strict';
 
+  // Easter Egg: 5x auf das Club Logo klicken öffnet das Login zum Admin Portal
+  const brand = document.getElementById('brand');
+  if (brand) {
+    let clicks = 0;
+    let timer = null;
+    brand.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      clicks++;
+      clearTimeout(timer);
+      brand.classList.remove('tap');
+      void brand.offsetWidth; // Animation neu starten
+      brand.classList.add('tap');
+      if (clicks >= 5) {
+        location.href = brand.dataset.admin;
+        return;
+      }
+      timer = setTimeout(() => {
+        if (clicks === 1) window.scrollTo({ top: 0, behavior: 'smooth' });
+        clicks = 0;
+      }, 1500);
+    });
+  }
+
   const cfg = JSON.parse(document.getElementById('app-config').textContent);
+
+  // Seite «Wir sind gleich zurück»: nur regelmässig prüfen und neu laden, sobald es weitergeht
+  if (document.body.dataset.state === 'paused') {
+    const check = async () => {
+      try {
+        const res = await fetch(`${cfg.base}api.php?action=status`, { cache: 'no-store' });
+        if (res.ok && (await res.json()).status !== 'paused') location.reload();
+      } catch (_) { /* nächster Versuch */ }
+    };
+    setInterval(check, 20000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    return;
+  }
+
   const f = cfg.features;
   const form = document.getElementById('reg-form');
   let status = cfg.status;
@@ -156,14 +203,23 @@
     const success = $('#success');
     if (success && !success.hidden) return; // nach erfolgreicher Anmeldung nichts mehr umschalten
 
-    const open = s.status === 'open';
-    $('#closed-box').hidden = open;
-    if (form) form.hidden = !open;
-    if (!open) {
-      $('[data-closed-title]').textContent = s.status === 'paused' ? 'Gleich zurück' : 'Anmeldung geschlossen';
-      $('[data-closed-message]').textContent = s.message;
-      $('#closed-box .state-icon').textContent = s.status === 'paused' ? '⏳' : '🏁';
+    // Pause beginnt: Seite neu laden, damit nur noch die Meldung erscheint
+    if (s.status === 'paused') {
+      location.reload();
+      return;
     }
+
+    // Ausgebucht oder geschlossen: Hinweis oben, Anmeldeknopf und Formular ausblenden
+    const open = s.status === 'open';
+    const banner = $('#state-banner');
+    banner.hidden = open;
+    if (!open) {
+      $('[data-state-title]').textContent = s.status === 'deadline' ? 'Anmeldung geschlossen' : 'Ausgebucht';
+      $('[data-state-message]').textContent = s.message;
+    }
+    $('#cta').hidden = !open;
+    $('#anmeldung').hidden = !open;
+    document.body.dataset.state = s.status;
     update();
   }
 
@@ -287,7 +343,6 @@
     if (total) total.textContent = chf(summary.total);
 
     form.hidden = true;
-    $('#closed-box').hidden = true;
     const box = $('#success');
     box.hidden = false;
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -295,4 +350,7 @@
   }
 
   update();
+
+  // Start erfolgreich: Hinweis entfernen
+  document.getElementById('js-warning')?.remove();
 })();

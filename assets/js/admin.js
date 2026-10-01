@@ -262,7 +262,9 @@
         <div class="toolbar-actions">
           <button class="btn btn-primary" id="add-reg">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Anmeldung hinzufügen</button>
-          <a class="btn btn-glass" href="${cfg.api}?action=export&csrf=${encodeURIComponent(cfg.csrf)}">CSV Export</a>
+          <a class="btn btn-glass" href="${cfg.api}?action=excel&csrf=${encodeURIComponent(cfg.csrf)}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg> Excel Export</a>
+          <a class="btn btn-glass" href="${cfg.api}?action=export&csrf=${encodeURIComponent(cfg.csrf)}">CSV</a>
         </div>
         <div class="chips" role="group" aria-label="Filter">
           ${filters.map(([k, l]) => `<button class="chip" data-filter="${esc(k)}" aria-pressed="${view.filter === k}">${esc(l)}</button>`).join('')}

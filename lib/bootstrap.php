@@ -49,6 +49,18 @@ function asset_url(string $path): string
     return base_path() . $path . ($mtime ? '?v=' . $mtime : '');
 }
 
+/** Favicon: Club Logo, falls konfiguriert, sonst das Standard Symbol. */
+function favicon_tag(): string
+{
+    $logo = trim((string) cfg('club.logo', ''));
+    $path = ($logo !== '' && is_file(APP_ROOT . '/' . ltrim($logo, '/'))) ? $logo : 'assets/img/favicon.svg';
+    $types = ['svg' => 'image/svg+xml', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'ico' => 'image/x-icon', 'webp' => 'image/webp', 'gif' => 'image/gif'];
+    $type  = $types[strtolower(pathinfo($path, PATHINFO_EXTENSION))] ?? 'image/png';
+    $url   = htmlspecialchars(asset_url($path), ENT_QUOTES, 'UTF-8');
+    return '<link rel="icon" href="' . $url . '" type="' . $type . '">' . "\n    "
+        . '<link rel="apple-touch-icon" href="' . $url . '">';
+}
+
 function e($value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -249,7 +261,7 @@ function registration_status(array $registrations, array $state): array
 
     if ($mode === 'paused') {
         $status  = 'paused';
-        $message = $state['message'] ?: 'Wir sind gleich zurück. Die Anmeldung ist vorübergehend nicht verfügbar.';
+        $message = $state['message'] ?: 'Die Anmeldung ist vorübergehend nicht verfügbar. Bitte versuche es in Kürze erneut.';
     } elseif ($mode === 'closed') {
         $status  = 'closed';
         $message = $state['message'] ?: 'Der Anlass ist ausgebucht. Vielen Dank für dein Interesse!';
