@@ -36,6 +36,20 @@ window.addEventListener('error', (ev) => {
   }
 
   const cfg = JSON.parse(document.getElementById('app-config').textContent);
+
+  // Seite «Wir sind gleich zurück»: nur regelmässig prüfen und neu laden, sobald es weitergeht
+  if (document.body.dataset.state === 'paused') {
+    const check = async () => {
+      try {
+        const res = await fetch(`${cfg.base}api.php?action=status`, { cache: 'no-store' });
+        if (res.ok && (await res.json()).status !== 'paused') location.reload();
+      } catch (_) { /* nächster Versuch */ }
+    };
+    setInterval(check, 20000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    return;
+  }
+
   const f = cfg.features;
   const form = document.getElementById('reg-form');
   let status = cfg.status;
@@ -189,14 +203,23 @@ window.addEventListener('error', (ev) => {
     const success = $('#success');
     if (success && !success.hidden) return; // nach erfolgreicher Anmeldung nichts mehr umschalten
 
-    const open = s.status === 'open';
-    $('#closed-box').hidden = open;
-    if (form) form.hidden = !open;
-    if (!open) {
-      $('[data-closed-title]').textContent = s.status === 'paused' ? 'Gleich zurück' : 'Anmeldung geschlossen';
-      $('[data-closed-message]').textContent = s.message;
-      $('#closed-box .state-icon').textContent = s.status === 'paused' ? '⏳' : '🏁';
+    // Pause beginnt: Seite neu laden, damit nur noch die Meldung erscheint
+    if (s.status === 'paused') {
+      location.reload();
+      return;
     }
+
+    // Ausgebucht oder geschlossen: Hinweis oben, Anmeldeknopf und Formular ausblenden
+    const open = s.status === 'open';
+    const banner = $('#state-banner');
+    banner.hidden = open;
+    if (!open) {
+      $('[data-state-title]').textContent = s.status === 'deadline' ? 'Anmeldung geschlossen' : 'Ausgebucht';
+      $('[data-state-message]').textContent = s.message;
+    }
+    $('#cta').hidden = !open;
+    $('#anmeldung').hidden = !open;
+    document.body.dataset.state = s.status;
     update();
   }
 
@@ -320,7 +343,6 @@ window.addEventListener('error', (ev) => {
     if (total) total.textContent = chf(summary.total);
 
     form.hidden = true;
-    $('#closed-box').hidden = true;
     const box = $('#success');
     box.hidden = false;
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
