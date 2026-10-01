@@ -62,8 +62,15 @@
     renderPill();
     renderOverview();
     renderList();
+    renderWaitlist();
     renderSettings();
   }
+
+  const payInfo = {
+    definitive: ['Definitiv', 'ok'],
+    pending: ['Provisorisch (Zahlung offen)', 'pending'],
+    overdue: ['Zahlung überfällig', 'overdue'],
+  };
 
   const statusText = {
     open: ['Anmeldung offen', 'ok'],
@@ -190,9 +197,13 @@
     ];
     if (f.children) kpis.push(['Kinder', kids, '']);
     if (f.payment) {
+      const defin = data.registrations.filter((r) => r.payState === 'definitive').reduce((a, r) => a + r.persons.length, 0);
+      const overdue = data.registrations.filter((r) => r.payState === 'overdue').reduce((a, r) => a + r.persons.length, 0);
+      kpis.push(['Definitiv', defin, overdue ? `${overdue} überfällig` : `${s.taken - defin} provisorisch`]);
       kpis.push(['Betrag total', chf(total), '']);
       kpis.push(['Bezahlt', chf(paid), `offen ${chf(total - paid)}`]);
     }
+    if (f.waitlist) kpis.push(['Warteliste', s.waiting, s.waiting === 1 ? 'Eintrag' : 'Einträge']);
 
     const cards = [];
     if (f.children) {
@@ -238,6 +249,8 @@
       if (!hay.includes(q)) return false;
     }
     if (view.filter === 'unpaid') return !r.paid && r.total > 0;
+    if (view.filter === 'pending') return r.payState === 'pending';
+    if (view.filter === 'overdue') return r.payState === 'overdue';
     if (view.filter === 'children') return r.persons.some((p) => p.type === 'child');
     if (view.filter === 'alt') return r.persons.some((p) => p.menu === 'alternative');
     if (view.filter.startsWith('role:')) return r.persons.some((p) => p.role === view.filter.slice(5));
@@ -251,7 +264,10 @@
     Object.entries(roles).forEach(([k, r]) => filters.push([`role:${k}`, r.label]));
     if (f.children) filters.push(['children', 'Mit Kindern']);
     if (f.alt_menu) filters.push(['alt', cfg.menu.alternative]);
-    if (f.payment) filters.push(['unpaid', 'Unbezahlt']);
+    if (f.payment) {
+      filters.push(['pending', 'Provisorisch']);
+      filters.push(['overdue', 'Zahlung überfällig']);
+    }
 
     const list = data.registrations.filter(matches).sort((a, b) => b.created_at.localeCompare(a.created_at));
 
@@ -322,7 +338,8 @@
       <article class="glass reg">
         <header class="reg-head">
           <div>
-            <h3>${esc(main.first)} ${esc(main.last)}</h3>
+            <h3>${esc(main.first)} ${esc(main.last)}
+              ${f.payment ? `<span class="pay-badge is-${payInfo[r.payState][1]}">${payInfo[r.payState][0]}</span>` : ''}</h3>
             <p class="muted small">${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a> · ` : ''}${fmtDate(r.created_at)}${r.source === 'admin' ? ' · <span class="tag">manuell</span>' : ''}</p>
             ${data.mailEnabled && r.email ? `<p class="muted small mail-state">${r.mailed_at ? `✓ Bestätigung gesendet ${fmtDate(r.mailed_at)}` : 'Keine Bestätigung gesendet'}</p>` : ''}
           </div>
@@ -340,6 +357,7 @@
           <span>${r.persons.length} ${r.persons.length === 1 ? 'Person' : 'Personen'}</span>
           ${f.payment ? `<strong>${chf(r.total)}</strong>
             <label class="switch"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : ''}
+          ${r.payState === 'overdue' ? `<p class="note note-overdue">Zahlung nach Anmeldeschluss nicht eingegangen. Platz freigeben (Anmeldung löschen) und der nächsten Person auf der Warteliste anbieten.</p>` : ''}
           ${r.notes ? `<p class="note">${esc(r.notes)}</p>` : ''}
         </footer>
       </article>`;
@@ -360,17 +378,81 @@
     toast(out.ok ? 'Anmeldung gelöscht.' : out.error, !out.ok);
   }
 
+  // --- Warteliste --------------------------------------------------------
+
+  const wlStatus = { waiting: 'Wartend', contacted: 'Kontaktiert', converted: 'Übernommen', declined: 'Abgesagt' };
+
+  function renderWaitlist() {
+    const el = $('#tab-waitlist');
+    if (!el || el.contains(document.activeElement)) return; // Eingaben nicht überschreiben
+    const list = data.waitlist || [];
+    const open = list.filter((w) => w.position);
+    const done = list.filter((w) => !w.position);
+    const freeNow = data.status.remaining;
+
+    const row = (w) => `
+      <article class="glass wl-row ${w.position ? '' : 'is-done'}">
+        <div class="wl-pos">${w.position ? w.position : '–'}</div>
+        <div class="wl-main">
+          <h3>${esc(w.first)} ${esc(w.last)} <span class="tag">${w.persons} ${w.persons === 1 ? 'Person' : 'Personen'}</span></h3>
+          <p class="muted small"><a href="mailto:${esc(w.email)}">${esc(w.email)}</a> · eingetragen ${fmtDate(w.created_at)}</p>
+          <label class="field wl-note"><span class="sr-only">Notiz</span>
+            <input type="text" data-wl-note="${esc(w.id)}" value="${esc(w.notes || '')}" placeholder="Notiz, z.B. am 03.12. angefragt" maxlength="300"></label>
+        </div>
+        <div class="wl-actions">
+          <label class="field"><span class="sr-only">Status</span>
+            <select data-wl-status="${esc(w.id)}">${Object.entries(wlStatus).map(([k, l]) => `<option value="${k}" ${w.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          ${w.position ? `<button class="btn btn-primary btn-sm" data-wl-convert="${esc(w.id)}">Anmeldung übernehmen</button>` : ''}
+          <button class="icon-btn danger" data-wl-delete="${esc(w.id)}" aria-label="Löschen" title="Löschen">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+        </div>
+      </article>`;
+
+    el.innerHTML = `
+      <div class="glass toolbar">
+        <h2>Warteliste</h2>
+        <p class="muted">${open.length} offene ${open.length === 1 ? 'Eintrag' : 'Einträge'} in der Reihenfolge der Eintragung.
+          ${freeNow > 0 ? `<strong>Aktuell ${freeNow === 1 ? 'ist 1 Platz' : `sind ${freeNow} Plätze`} frei.</strong>` : 'Aktuell sind keine Plätze frei.'}
+          Solange jemand auf der Warteliste steht, bleibt die Anmeldung für neue Personen geschlossen.</p>
+        <p class="muted small">Ablauf: Person kontaktieren und Status auf «Kontaktiert» setzen. Sagt sie zu, mit «Anmeldung übernehmen» erfassen. Sagt sie ab, Status «Abgesagt».</p>
+      </div>
+      <div class="wl-list">${open.length ? open.map(row).join('') : '<div class="glass empty">Niemand auf der Warteliste.</div>'}</div>
+      ${done.length ? `<details class="wl-done"><summary>Erledigt (${done.length})</summary><div class="wl-list">${done.map(row).join('')}</div></details>` : ''}`;
+
+    $$('[data-wl-status]', el).forEach((sel) => sel.addEventListener('change', async () => {
+      const out = await api('waitlist_update', { id: sel.dataset.wlStatus, status: sel.value });
+      toast(out.ok ? 'Status gespeichert.' : out.error, !out.ok);
+    }));
+    $$('[data-wl-note]', el).forEach((inp) => inp.addEventListener('change', async () => {
+      const out = await api('waitlist_update', { id: inp.dataset.wlNote, notes: inp.value });
+      toast(out.ok ? 'Notiz gespeichert.' : out.error, !out.ok);
+    }));
+    $$('[data-wl-delete]', el).forEach((b) => b.addEventListener('click', async () => {
+      const w = list.find((x) => x.id === b.dataset.wlDelete);
+      if (!confirm(`${w.first} ${w.last} von der Warteliste löschen?`)) return;
+      const out = await api('waitlist_delete', { id: w.id });
+      toast(out.ok ? 'Eintrag gelöscht.' : out.error, !out.ok);
+    }));
+    $$('[data-wl-convert]', el).forEach((b) => b.addEventListener('click', () => {
+      openEditor(null, list.find((x) => x.id === b.dataset.wlConvert));
+    }));
+  }
+
   // --- Editor -----------------------------------------------------------
 
-  function openEditor(reg) {
+  function openEditor(reg, fromWaitlist = null) {
     const dlg = $('#editor');
+    if (fromWaitlist) {
+      reg = null;
+    }
     const model = {
+      waitlistId: fromWaitlist?.id || '',
       id: reg?.id || '',
-      email: reg?.email || '',
+      email: reg?.email || fromWaitlist?.email || '',
       paid: !!reg?.paid,
       notes: reg?.notes || '',
       sendMail: !reg,
-      main: reg?.persons.find((p) => p.relation === 'main') || { first: '', last: '', menu: 'standard', role: '' },
+      main: reg?.persons.find((p) => p.relation === 'main') || { first: fromWaitlist?.first || '', last: fromWaitlist?.last || '', menu: 'standard', role: '' },
       companion: reg?.persons.find((p) => p.relation === 'companion') || null,
       children: reg?.persons.filter((p) => p.relation === 'child') || [],
     };
@@ -414,6 +496,7 @@
             <button type="button" class="icon-btn" data-close aria-label="Schliessen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
           </header>
           <div class="dlg-body">
+            ${fromWaitlist ? `<div class="alert alert-notice">Aus der Warteliste: ${esc(fromWaitlist.first)} ${esc(fromWaitlist.last)} hat sich für <strong>${fromWaitlist.persons} ${fromWaitlist.persons === 1 ? 'Person' : 'Personen'}</strong> eingetragen. Weitere Person und Kinder bitte unten ergänzen.</div>` : ''}
             ${personFields('main', model.main, 'Hauptperson', false)}
             <label class="field"><span>E-Mail</span><input type="email" name="email" value="${esc(model.email)}" maxlength="120"></label>
             ${model.companion ? personFields('companion', model.companion, 'Weitere Person', true) : ''}
@@ -457,7 +540,7 @@
         id: model.id, email: model.email, paid: model.paid, notes: model.notes,
         main: model.main, companion: model.companion, children: model.children,
       };
-      const out = await api('save', { registration: payload, force, sendMail: model.sendMail && !!model.email });
+      const out = await api('save', { registration: payload, force, sendMail: model.sendMail && !!model.email, waitlistId: model.waitlistId });
       if (out.ok) {
         dlg.close();
         if (out.mailSent === false) toast('Gespeichert, aber die Bestätigung konnte nicht versendet werden.', true);

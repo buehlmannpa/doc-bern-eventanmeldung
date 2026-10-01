@@ -527,3 +527,36 @@ fieldset { margin: 0; min-width: 0; }
 .paused-card { width: min(100%, 560px); text-align: center; }
 .paused-card h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); }
 .paused-card .lead { margin: 0; }
+
+/* --- Ort: Name (mit Link) und Adresse getrennt ------------------------- */
+
+.facts li.fact-location { align-items: flex-start; border-radius: var(--radius-md); padding: 10px 16px; }
+.facts li.fact-location > svg { margin-top: 2px; }
+.loc { display: grid; gap: 2px; }
+.loc-name { font-weight: 650; color: var(--text); }
+a.loc-name { display: inline-flex; align-items: center; gap: 6px; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+a.loc-name:hover { text-decoration-color: var(--brand); color: var(--accent-text); }
+.loc-name .ext { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; }
+.loc-addr { color: var(--text-2); font-size: .9rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* --- Zahlungsbedingungen ---------------------------------------------- */
+
+.terms {
+  margin: 12px 0 0; padding: 12px 14px; border-radius: var(--radius-md);
+  background: var(--notice-bg); border: 1px solid var(--notice-border); color: var(--notice-text);
+  font-size: .92rem; text-align: left;
+}
+
+/* --- Warteliste ------------------------------------------------------- */
+
+.btn-banner {
+  justify-self: start; margin-top: 10px; min-height: 42px; padding: 0 18px;
+  background: #fff; color: var(--brand); box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .4);
+}
+@media (hover: hover) { .btn-banner:hover { background: #fff3f3; } }
+.waitlist { display: grid; gap: 14px; }
+.waitlist h2 { margin: 0; }
+.waitlist p { margin: 0; }
+.wl-position { font-size: 1.2rem; }
+.wl-position strong { font-size: 2.4rem; color: var(--accent-text); vertical-align: middle; margin-left: 6px; }

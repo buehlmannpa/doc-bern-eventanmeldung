@@ -132,3 +132,83 @@ function form_post_to_input(array $post): array
     }
     return $in;
 }
+
+/**
+ * Eintrag auf die Warteliste (nur möglich, wenn der Anlass ausgebucht bzw. geschlossen ist).
+ * @return array ok: bool, error?: string, code?: int, fields?: array, position?: int, mailSent?: bool, status?: array
+ */
+function waitlist_attempt(array $in): array
+{
+    if (!empty($in['website'])) {
+        return ['ok' => false, 'code' => 400, 'error' => 'Eintrag konnte nicht verarbeitet werden.'];
+    }
+    $fields = [];
+    $first  = clean_text($in['first'] ?? '', 60);
+    $last   = clean_text($in['last'] ?? '', 60);
+    $email  = mb_strtolower(clean_text($in['email'] ?? '', 120));
+    $max    = (cfg('features.companion') || cfg('features.children')) ? 1 + (cfg('features.companion') ? 1 : 0) + (int) cfg('features.max_children', 8) : 1;
+    $people = max(1, min($max, (int) ($in['persons'] ?? 1)));
+
+    if ($first === '') { $fields['wl_first'] = 'Bitte Vorname angeben.'; }
+    if ($last === '')  { $fields['wl_last'] = 'Bitte Nachname angeben.'; }
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) { $fields['wl_email'] = 'Bitte gültige E-Mail Adresse angeben.'; }
+    if (empty($in['consent'])) { $fields['wl_consent'] = 'Bitte bestätigen.'; }
+    if ($fields) {
+        return ['ok' => false, 'code' => 422, 'error' => 'Bitte prüfe die markierten Felder.', 'fields' => $fields];
+    }
+
+    $result = store()->locked(function (Store $s) use ($first, $last, $email, $people) {
+        $list   = $s->waitlist();
+        $status = registration_status($s->registrations(), $s->state(), $list);
+        if (!$status['waitlist']) {
+            return ['error' => $status['status'] === 'open'
+                ? 'Es sind noch Plätze frei. Du kannst dich direkt anmelden.'
+                : 'Die Warteliste ist zurzeit nicht verfügbar.', 'code' => 409, 'status' => $status];
+        }
+        foreach ($s->registrations() as $r) {
+            if (($r['email'] ?? '') === $email) {
+                return ['error' => 'Mit dieser E-Mail Adresse besteht bereits eine Anmeldung.', 'code' => 409, 'fields' => ['wl_email' => 'Bereits angemeldet.']];
+            }
+        }
+        $open = waitlist_open($list);
+        foreach ($open as $i => $w) {
+            if (($w['email'] ?? '') === $email) {
+                return ['error' => 'Du stehst bereits auf der Warteliste (Position ' . ($i + 1) . ').', 'code' => 409, 'fields' => ['wl_email' => 'Bereits eingetragen.']];
+            }
+        }
+        $entry = [
+            'id'         => random_id(8),
+            'created_at' => date('c'),
+            'first'      => $first,
+            'last'       => $last,
+            'email'      => $email,
+            'persons'    => $people,
+            'status'     => 'waiting',
+            'notes'      => '',
+        ];
+        $list[] = $entry;
+        $s->saveWaitlist($list);
+        return ['entry' => $entry, 'position' => count($open) + 1];
+    });
+
+    if (isset($result['error'])) {
+        return ['ok' => false] + $result;
+    }
+
+    $mailSent = mail_enabled() ? send_waitlist_confirmation($result['entry'], $result['position']) : false;
+    return ['ok' => true, 'position' => $result['position'], 'mailSent' => $mailSent, 'email' => $result['entry']['email']];
+}
+
+/** Klassisch abgeschicktes Wartelisten Formular (ohne JavaScript) umwandeln. */
+function waitlist_post_to_input(array $post): array
+{
+    $get = fn (string $k) => is_string($post[$k] ?? null) ? $post[$k] : '';
+    return [
+        'first'   => $get('wl_first'),
+        'last'    => $get('wl_last'),
+        'email'   => $get('wl_email'),
+        'persons' => $get('wl_persons'),
+        'consent' => $get('wl_consent') !== '',
+        'website' => $get('website'),
+    ];
+}

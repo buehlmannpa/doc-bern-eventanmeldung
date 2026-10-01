@@ -32,19 +32,12 @@ Das Logo wird automatisch auch als Symbol im Browser Tab (Favicon) und auf dem S
 
 ## 3. TWINT QR Code
 
-1. Den QR Code, den ihr für euer TWINT Konto erhalten habt, als Bild speichern.
-   * **Format PNG oder JPG** verwenden. Ein SVG wird auf der Webseite angezeigt, in der Bestätigungsmail aber von vielen Mailprogrammen nicht.
+1. Den QR Code, den ihr für euer TWINT Konto erhalten habt, als **PNG** speichern und genau so benennen: **`twint_code_big.PNG`** (Gross und Kleinschreibung beachten, der Server unterscheidet das).
    * Quadratisch, mindestens 400 × 400 Pixel.
-2. Datei nach `assets/img/twint-qr.png` hochladen.
-3. In `config/event.php` eintragen:
-   ```php
-   'twint' => [
-       'qr'   => 'assets/img/twint-qr.png',
-       'note' => 'Bitte bei der Zahlung Vor und Nachname angeben.',
-   ],
-   ```
-4. Den Hinweistext (`note`) nach Wunsch anpassen.
-5. Den Platzhalter `assets/img/twint-qr.svg` kann man danach löschen.
+2. Datei in den Ordner `assets/img/` hochladen. Der Pfad ist in `config/event.php` bereits eingetragen (`'qr' => 'assets/img/twint_code_big.PNG'`).
+3. Der QR Code erscheint auf der Seite unter «Kosten und Bezahlung», nach der Anmeldung und in der Bestätigungsmail (im Text und zusätzlich als Anhang `twint_code_big.PNG`).
+4. Solange die Datei fehlt, zeigt die Seite einen Platzhalter und die Mail enthält keinen QR Code.
+5. Den Hinweistext (`twint.note`) nach Wunsch anpassen.
 
 ## 4. Inhalte des Anlasses
 
@@ -56,7 +49,8 @@ In `config/event.php` im Bereich `event`:
 | `date` | `2026-12-05` | Format JJJJ-MM-TT |
 | `start` / `end` | `19:30` / `24:00` | für Anzeige und Kalendereintrag |
 | `location` | `Restaurant Bären` | Name des Lokals |
-| `address` | `Bahnhofstrasse 1, 3000 Bern` | erscheint auch im Kalendereintrag |
+| `address` | `Bahnhofstrasse 1, 3000 Bern` | wird unter dem Namen angezeigt, auch im Kalendereintrag |
+| `location_url` | `https://www.baeren-bern.ch` | Website des Lokals, öffnet beim Klick auf den Namen in neuem Tab (leer = kein Link) |
 | `description` | Einladungstext | frei wählbar |
 
 Weitere Punkte:
@@ -65,7 +59,7 @@ Weitere Punkte:
 * **Ablauf:** unter `program` die Zeiten und Programmpunkte prüfen.
 * **Preise:** unter `prices` prüfen (aktuell Erwachsene 51, Kinder 25 CHF).
 * **Limit:** `capacity` (aktuell 80 Personen). Kann im CMS jederzeit übersteuert werden.
-* **Anmeldeschluss (optional):** `deadline`, z.B. `'2026-11-28 23:59'`. Danach schliesst die Anmeldung automatisch.
+* **Anmeldeschluss und Zahlungsfrist:** `deadline`, z.B. `'2026-11-28 23:59'`. Danach schliesst die Anmeldung automatisch. Der gleiche Zeitpunkt gilt als Zahlungsfrist (siehe Abschnitt 6a).
 
 ## 5. Verweis auf die andere Anmeldung
 
@@ -83,6 +77,15 @@ Nach der Anmeldung zum Weihnachtsessen erscheint ein Hinweis auf die GV (und umg
 * `mail.from`: Absender der Bestätigung. Die Adresse muss als Mailbox **bei Hostpoint** existieren, sonst landen die Mails im Spam.
 * `mail.bcc` (optional): Adresse, die eine Kopie jeder Bestätigung erhält, z.B. `info@doc-bern.ch`.
 * Der Versand läuft über den Webserver von Hostpoint, es wird **kein Passwort** hinterlegt.
+
+## 6a. Zahlung, definitive Anmeldung und Warteliste
+
+* Eine Anmeldung ist erst **definitiv**, wenn sie bezahlt ist. Das steht auf der Seite, nach der Anmeldung und in der Mail.
+* Im CMS hat jede Anmeldung einen Status: **Definitiv** (bezahlt oder kostenlos), **Provisorisch** (Zahlung offen) und nach dem Anmeldeschluss **Zahlung überfällig** (rot). Mit den Filtern «Provisorisch» und «Zahlung überfällig» findest du sie schnell.
+* Ist der Anlass ausgebucht oder die Anmeldung geschlossen, können sich Interessierte auf die **Warteliste** setzen (Name, E-Mail, Anzahl Personen). Sie erhalten eine Bestätigung mit ihrer Position.
+* Solange jemand auf der Warteliste steht, bleibt die Anmeldung für neue Personen geschlossen, auch wenn Plätze frei werden. So kommt niemand an der Warteliste vorbei.
+* **Platz weitergeben:** überfällige Anmeldung im CMS löschen, im Tab «Warteliste» die nächste Person kontaktieren (Status «Kontaktiert»), bei Zusage «Anmeldung übernehmen». Die Person erhält dann die normale Anmeldebestätigung mit QR Code.
+* Ausschalten: in `features` den Wert `'waitlist' => false` setzen.
 
 ## 7. Sicherheit
 
@@ -117,7 +120,8 @@ Falls auf dem gleichen Server getestet wurde:
 - [ ] Bestätigungsmail kommt an (auch Spamordner prüfen), QR Code und Kalender Anhang sind enthalten
 - [ ] Kalendereintrag lässt sich nach der Anmeldung herunterladen
 - [ ] Link auf die andere Anmeldung (GV bzw. Weihnachtsessen) funktioniert
-- [ ] CMS: Anmeldung sichtbar, Rolle setzen, Bezahlt markieren, Excel Export öffnen
+- [ ] CMS: Anmeldung sichtbar (Status «Provisorisch»), Rolle setzen, Bezahlt markieren (Status «Definitiv»), Excel Export öffnen
+- [ ] Limit im CMS kurz auf die aktuelle Anzahl setzen: «Ausgebucht» und Warteliste erscheinen, Testeintrag auf die Warteliste, danach Limit zurücksetzen und Testeintrag löschen
 - [ ] CMS: Status «Ausgebucht» testen (roter Hinweis oben, kein Anmeldeknopf) und «Wir sind gleich zurück» (nur die Meldung), danach wieder auf «Offen» stellen
 - [ ] Testanmeldung im CMS löschen
 
