@@ -38,6 +38,8 @@ $timeText = cfg('event.start') . ' bis ' . cfg('event.end') . ' Uhr';
 $twintQr  = (string) cfg('twint.qr', '');
 $pct      = $status['capacity'] > 0 ? min(100, round($status['taken'] / $status['capacity'] * 100)) : 100;
 $contact  = (string) cfg('club.contact_email', '');
+$paused   = $status['status'] === 'paused' && !$done;
+$closed   = !in_array($status['status'], ['open', 'paused'], true) && !$done;
 $asset    = fn (string $p) => e(asset_url($p));
 $base     = e(base_path());
 ?>
@@ -51,13 +53,13 @@ $base     = e(base_path());
     <meta name="theme-color" content="#0e0e10" media="(prefers-color-scheme: dark)">
     <meta name="robots" content="noindex">
     <title><?= e(cfg('event.title')) ?> | <?= e(cfg('club.short')) ?></title>
-    <link rel="icon" href="<?= $asset('assets/img/favicon.svg') ?>" type="image/svg+xml">
+    <?= favicon_tag() ?>
     <link rel="stylesheet" href="<?= $asset('assets/css/base.css') ?>">
     <?php if ($theme && is_file(__DIR__ . "/assets/css/themes/$theme.css")): ?>
         <link rel="stylesheet" href="<?= $asset("assets/css/themes/$theme.css") ?>">
     <?php endif; ?>
 </head>
-<body class="<?= $theme ? 'theme-' . e($theme) : '' ?>">
+<body class="<?= $theme ? 'theme-' . e($theme) : '' ?><?= $paused ? ' is-paused' : '' ?>" data-state="<?= e($status['status']) ?>">
 <div class="backdrop" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
 
 <header class="topbar">
@@ -73,12 +75,29 @@ $base     = e(base_path());
     </div>
 </header>
 
+<?php if ($paused): ?>
+<main class="wrap paused-wrap">
+    <section class="glass paused-card" role="status">
+        <div class="state-icon" aria-hidden="true">⏳</div>
+        <h1>Wir sind gleich zurück</h1>
+        <p class="lead"><?= e($status['message']) ?></p>
+    </section>
+</main>
+<?php else: ?>
 <main class="wrap">
 
     <!-- Hero -->
     <section class="glass hero">
-        <p class="eyebrow"><?= e(cfg('club.short')) ?> lädt ein</p>
         <h1><?= e(cfg('event.title')) ?></h1>
+        <div class="state-banner" id="state-banner" role="status" <?= $closed ? '' : 'hidden' ?>>
+            <span class="state-banner-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+            </span>
+            <span>
+                <strong data-state-title><?= $status['status'] === 'deadline' ? 'Anmeldung geschlossen' : 'Ausgebucht' ?></strong>
+                <span data-state-message><?= e($status['message']) ?></span>
+            </span>
+        </div>
         <?php if (cfg('event.subtitle')): ?><p class="lead"><?= e(cfg('event.subtitle')) ?></p><?php endif; ?>
         <ul class="facts">
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3M17 2v3M3.5 9h17M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg><?= e(format_date_long((string) cfg('event.date'))) ?></li>
@@ -86,7 +105,7 @@ $base     = e(base_path());
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg><?= e(cfg('event.location')) ?><?= cfg('event.address') ? ', ' . e(cfg('event.address')) : '' ?></li>
         </ul>
         <?php if (cfg('event.description')): ?><p class="desc"><?= nl2br(e(cfg('event.description'))) ?></p><?php endif; ?>
-        <div class="hero-actions">
+        <div class="hero-actions" id="cta" <?= $closed ? 'hidden' : '' ?>>
             <a href="#anmeldung" class="btn btn-primary">Jetzt anmelden</a>
         </div>
     </section>
@@ -166,14 +185,8 @@ $base     = e(base_path());
     <?php endif; ?>
 
     <!-- Anmeldung -->
-    <section class="glass" id="anmeldung">
-        <div id="closed-box" class="state-box" <?= ($status['status'] === 'open' || $done) ? 'hidden' : '' ?>>
-            <div class="state-icon" aria-hidden="true"><?= $status['status'] === 'paused' ? '⏳' : '🏁' ?></div>
-            <h2 data-closed-title><?= $status['status'] === 'paused' ? 'Gleich zurück' : 'Anmeldung geschlossen' ?></h2>
-            <p data-closed-message><?= e($status['message']) ?></p>
-        </div>
-
-        <form id="reg-form" method="post" action="<?= $base ?>#anmeldung" novalidate <?= ($status['status'] !== 'open' || $done) ? 'hidden' : '' ?>>
+    <section class="glass" id="anmeldung" <?= $closed ? 'hidden' : '' ?>>
+        <form id="reg-form" method="post" action="<?= $base ?>#anmeldung" novalidate <?= $done ? 'hidden' : '' ?>>
             <h2>Anmeldung</h2>
 
             <div class="alert alert-error js-warning" id="js-warning" role="alert">
@@ -290,6 +303,7 @@ $base     = e(base_path());
 <footer class="wrap footer">
     <p>© <?= date('Y') ?> <?= e(cfg('club.name')) ?><?php if (cfg('club.contact_email')): ?> · <a href="mailto:<?= e(cfg('club.contact_email')) ?>"><?= e(cfg('club.contact_email')) ?></a><?php endif; ?></p>
 </footer>
+<?php endif; ?>
 
 <script type="application/json" id="app-config"><?= json_encode(public_config() + ['status' => $status, 'base' => base_path()], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <script src="<?= $asset('assets/js/app.js') ?>"></script>

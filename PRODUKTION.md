@@ -28,7 +28,7 @@ Stellen, die noch angepasst werden müssen, sind in der Datei mit `TODO` markier
 4. Das Logo erscheint oben links auf der Anmeldeseite und im CMS.
 5. **Easter Egg:** 5x schnell hintereinander auf das Logo klicken (bzw. tippen) öffnet das Login zum Admin Portal.
 
-Optional: Das kleine Symbol im Browser Tab ersetzen: `assets/img/favicon.svg`.
+Das Logo wird automatisch auch als Symbol im Browser Tab (Favicon) und auf dem Smartphone Startbildschirm verwendet. Am besten wirkt dafür ein quadratisches Logo.
 
 ## 3. TWINT QR Code
 
@@ -118,7 +118,7 @@ Falls auf dem gleichen Server getestet wurde:
 - [ ] Kalendereintrag lässt sich nach der Anmeldung herunterladen
 - [ ] Link auf die andere Anmeldung (GV bzw. Weihnachtsessen) funktioniert
 - [ ] CMS: Anmeldung sichtbar, Rolle setzen, Bezahlt markieren, Excel Export öffnen
-- [ ] CMS: Status «Ausgebucht» und «Wir sind gleich zurück» testen, danach wieder auf «Offen» stellen
+- [ ] CMS: Status «Ausgebucht» testen (roter Hinweis oben, kein Anmeldeknopf) und «Wir sind gleich zurück» (nur die Meldung), danach wieder auf «Offen» stellen
 - [ ] Testanmeldung im CMS löschen
 
 ## 11. Während und nach dem Anlass

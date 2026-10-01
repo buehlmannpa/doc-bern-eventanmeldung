@@ -502,3 +502,28 @@ fieldset { margin: 0; min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* --- Ausgebucht / geschlossen: Hinweis direkt im Kopfbereich ---------- */
+
+.state-banner {
+  display: flex; align-items: center; gap: 14px;
+  margin: 4px 0 18px; padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--brand-strong), var(--brand));
+  color: var(--brand-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 12px 28px -14px var(--brand);
+}
+.state-banner > span:last-child { display: grid; gap: 2px; }
+.state-banner strong { font-size: 1.25rem; letter-spacing: -.01em; }
+.state-banner-icon {
+  display: grid; place-items: center; flex: none;
+  width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .18);
+}
+.state-banner-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+
+/* --- «Wir sind gleich zurück»: nur die Meldung ------------------------- */
+
+.paused-wrap { min-height: calc(100vh - 140px); min-height: calc(100dvh - 140px); place-items: center; align-content: center; }
+.paused-card { width: min(100%, 560px); text-align: center; }
+.paused-card h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); }
+.paused-card .lead { margin: 0; }

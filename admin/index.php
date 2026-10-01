@@ -53,7 +53,7 @@ $base  = e(base_path());
     <meta name="theme-color" content="#0e0e10" media="(prefers-color-scheme: dark)">
     <meta name="robots" content="noindex, nofollow">
     <title>CMS | <?= e(cfg('event.title')) ?></title>
-    <link rel="icon" href="<?= $asset('assets/img/favicon.svg') ?>" type="image/svg+xml">
+    <?= favicon_tag() ?>
     <link rel="stylesheet" href="<?= $asset('assets/css/base.css') ?>">
     <link rel="stylesheet" href="<?= $asset('assets/css/admin.css') ?>">
 </head>
