@@ -113,11 +113,13 @@ $base  = e(base_path());
     <nav class="tabs" role="tablist">
         <button role="tab" class="tab" data-tab="overview" aria-selected="true">Übersicht</button>
         <button role="tab" class="tab" data-tab="list" aria-selected="false">Anmeldungen</button>
+        <?php if (cfg('features.waitlist')): ?><button role="tab" class="tab" data-tab="waitlist" aria-selected="false">Warteliste</button><?php endif; ?>
         <button role="tab" class="tab" data-tab="settings" aria-selected="false">Einstellungen</button>
     </nav>
 
     <section id="tab-overview" class="tab-panel"></section>
     <section id="tab-list" class="tab-panel" hidden></section>
+    <?php if (cfg('features.waitlist')): ?><section id="tab-waitlist" class="tab-panel" hidden></section><?php endif; ?>
     <section id="tab-settings" class="tab-panel" hidden></section>
 </main>
 

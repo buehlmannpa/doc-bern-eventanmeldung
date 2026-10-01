@@ -21,6 +21,11 @@ try {
         json_response($result, $result['ok'] ? 200 : (int) $result['code']);
     }
 
+    if ($action === 'waitlist' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $result = waitlist_attempt(read_json_body());
+        json_response($result, $result['ok'] ? 200 : (int) $result['code']);
+    }
+
     json_response(['ok' => false, 'error' => 'Unbekannte Aktion.'], 404);
 } catch (Throwable $ex) {
     error_log('[anmeldung] ' . $ex->getMessage());

@@ -30,6 +30,7 @@ return [
         'end'         => '23:00',
         'location'    => 'Ort folgt',
         'address'     => '',
+        'location_url' => '',                         // Website des Lokals (öffnet beim Klick auf den Namen in neuem Tab)
         'description' => 'Wir freuen uns auf einen gemütlichen Abend mit dir.',
     ],
 
@@ -37,6 +38,7 @@ return [
     'capacity' => 80,
 
     // Anmeldeschluss (leer = kein Anmeldeschluss). Format: 'JJJJ-MM-TT HH:MM'
+    // Gilt auch als Zahlungsfrist: Wer bis dann nicht bezahlt hat, wird im CMS als «Zahlung überfällig» markiert.
     'deadline' => '',
 
     // ------------------------------------------------------------------
@@ -49,6 +51,7 @@ return [
         'alt_menu'     => false,  // Menüwahl pro Person (Standard / Alternativ)
         'payment'      => false,  // Kosten und TWINT QR Code anzeigen
         'calendar'     => true,   // Kalendereintrag (.ics) anbieten
+        'waitlist'     => true,   // Warteliste, sobald ausgebucht oder geschlossen
     ],
 
     // ------------------------------------------------------------------
@@ -72,7 +75,7 @@ return [
     ],
 
     'twint' => [
-        'qr'   => 'assets/img/twint-qr.svg',          // TODO: eigenen QR Code als PNG hochladen und z.B. 'assets/img/twint-qr.png' eintragen (PNG/JPG nötig für die Mail)
+        'qr'   => 'assets/img/twint_code_big.PNG',   // TODO: QR Code mit genau diesem Namen hochladen (Gross/Kleinschreibung beachten). Fehlt die Datei, erscheint ein Platzhalter.
         'note' => 'Bitte bei der Zahlung Vor und Nachname angeben.',
     ],
 

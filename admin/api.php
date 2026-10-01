@@ -25,13 +25,23 @@ function snapshot(Store $s): array
 {
     $list = $s->registrations();
     foreach ($list as &$r) {
-        $r['total'] = registration_total($r);
+        $r['total']    = registration_total($r);
+        $r['payState'] = registration_payment_state($r);
     }
     unset($r);
+    $waitlist = $s->waitlist();
+    $pos = 0;
+    foreach ($waitlist as &$w) {
+        $w['position'] = in_array($w['status'] ?? 'waiting', ['waiting', 'contacted'], true) ? ++$pos : null;
+    }
+    unset($w);
     return [
         'ok'            => true,
         'registrations' => $list,
-        'status'        => registration_status($list, $s->state()),
+        'status'        => registration_status($list, $s->state(), $waitlist),
+        'waitlist'      => $waitlist,
+        'deadline'      => deadline_text(),
+        'deadlinePassed'=> deadline_passed(),
         'state'         => $s->state(),
         'defaultCap'    => (int) cfg('capacity', 80),
         'mailEnabled'   => mail_enabled(),
@@ -67,6 +77,7 @@ try {
         $list    = $store->registrations();
         usort($list, fn ($a, $b) => strcmp($a['created_at'], $b['created_at']));
         $status  = registration_status($list, $store->state());
+        $payName = ['definitive' => 'Definitiv', 'pending' => 'Provisorisch', 'overdue' => 'Zahlung überfällig'];
         $relName = ['main' => 'Hauptperson', 'companion' => 'Weitere Person', 'child' => 'Kind'];
         $menu    = fn ($m) => (string) cfg("menu.$m.label", $m);
         $date    = fn ($iso) => $iso ? date('d.m.Y H:i', strtotime($iso)) : '';
@@ -82,7 +93,7 @@ try {
         // Tabelle Anmeldungen
         $gHead = ['Nr.', 'Angemeldet am', 'Hauptperson', 'E-Mail', 'Personen', 'Erwachsene', 'Kinder'];
         $gW    = [6, 17, 24, 28, 10, 11, 8];
-        if ($f['payment']) { $gHead[] = 'Betrag'; $gW[] = 11; $gHead[] = 'Bezahlt'; $gW[] = 9; }
+        if ($f['payment']) { $gHead[] = 'Betrag'; $gW[] = 11; $gHead[] = 'Bezahlt'; $gW[] = 9; $gHead[] = 'Status'; $gW[] = 18; }
         if (mail_enabled()) { $gHead[] = 'Bestätigung gesendet'; $gW[] = 20; }
         $gHead[] = 'Quelle'; $gW[] = 10;
         $gHead[] = 'Notiz'; $gW[] = 30;
@@ -114,7 +125,7 @@ try {
 
             $main = $r['persons'][0];
             $row  = [$nr, $date($r['created_at']), $main['first'] . ' ' . $main['last'], $r['email'], count($r['persons']), $adults, $kids];
-            if ($f['payment']) { $row[] = ['money' => $total]; $row[] = $paid ? 'ja' : 'nein'; }
+            if ($f['payment']) { $row[] = ['money' => $total]; $row[] = $paid ? 'ja' : 'nein'; $row[] = $payName[registration_payment_state($r)]; }
             if (mail_enabled()) { $row[] = $date($r['mailed_at'] ?? ''); }
             $row[] = ($r['source'] ?? 'web') === 'admin' ? 'manuell' : 'Website';
             $row[] = $r['notes'] ?? '';
@@ -142,6 +153,17 @@ try {
             $ov[] = [$role['label'] . ($role['free'] ? ' (kostenlos)' : ''), $roleCount[$k]];
         }
         if ($f['payment']) {
+            $defin = 0;
+            foreach ($list as $r) {
+                if (registration_payment_state($r) === 'definitive') { $defin += count($r['persons']); }
+            }
+            $ov[] = ['Personen definitiv (bezahlt)', $defin];
+            $ov[] = ['Personen provisorisch (offen)', $status['taken'] - $defin];
+        }
+        if (cfg('features.waitlist')) {
+            $ov[] = ['Warteliste (offene Einträge)', $status['waiting']];
+        }
+        if ($f['payment']) {
             $ov[] = [];
             $ov[] = ['Betrag total', ['money' => $sum['total']]];
             $ov[] = ['Bezahlt', ['money' => $sum['paid']]];
@@ -156,11 +178,23 @@ try {
             $fills[$k] = vsprintf('%02X%02X%02X', array_map(fn ($c) => (int) round($c + (255 - $c) * 0.65), $rgb));
         }
 
-        $xlsx = (new XlsxWriter($fills))->build([
+        $sheets = [
             ['name' => 'Übersicht',   'widths' => [28, 22], 'rows' => $ov],
             ['name' => 'Personen',    'widths' => $pW, 'header' => $pHead, 'rows' => $pRows, 'styles' => $pStyles],
             ['name' => 'Anmeldungen', 'widths' => $gW, 'header' => $gHead, 'rows' => $gRows],
-        ]);
+        ];
+        if (cfg('features.waitlist')) {
+            $wlName = ['waiting' => 'Wartend', 'contacted' => 'Kontaktiert', 'converted' => 'Übernommen', 'declined' => 'Abgesagt'];
+            $wRows  = [];
+            $pos    = 0;
+            foreach ($store->waitlist() as $w) {
+                $open    = in_array($w['status'] ?? 'waiting', ['waiting', 'contacted'], true);
+                $wRows[] = [$open ? ++$pos : '', $date($w['created_at']), $w['first'], $w['last'], $w['email'], (int) ($w['persons'] ?? 1), $wlName[$w['status'] ?? 'waiting'] ?? '', $w['notes'] ?? ''];
+            }
+            $sheets[] = ['name' => 'Warteliste', 'widths' => [10, 17, 16, 18, 28, 10, 14, 30],
+                'header' => ['Position', 'Eingetragen am', 'Vorname', 'Nachname', 'E-Mail', 'Personen', 'Status', 'Notiz'], 'rows' => $wRows];
+        }
+        $xlsx = (new XlsxWriter($fills))->build($sheets);
 
         $name = preg_replace('/[^a-z0-9\-]/i', '-', (string) cfg('event.id')) . '-' . date('Y-m-d') . '.xlsx';
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -276,6 +310,23 @@ try {
             json_response(['ok' => false] + $result, $result['code']);
         }
 
+        // Aus der Warteliste übernommen: Eintrag als erledigt markieren
+        $wlId = (string) ($in['waitlistId'] ?? '');
+        if ($wlId !== '') {
+            $store->locked(function (Store $s) use ($wlId, $result) {
+                $wl = $s->waitlist();
+                foreach ($wl as &$w) {
+                    if (($w['id'] ?? '') === $wlId) {
+                        $w['status']       = 'converted';
+                        $w['converted_at'] = date('c');
+                        $w['registration'] = $result['reg']['id'];
+                    }
+                }
+                unset($w);
+                $s->saveWaitlist($wl);
+            });
+        }
+
         $mailSent = null;
         if (!empty($in['sendMail']) && $result['reg']['email'] !== '') {
             $mailSent = send_confirmation($result['reg']);
@@ -327,6 +378,33 @@ try {
                 $list[$idx]['updated_at'] = date('c');
                 $s->saveRegistrations($list);
             }
+        });
+        json_response(snapshot($store));
+    }
+
+    // --- Warteliste: Status/Notiz ändern oder löschen ---------------------------
+    if ($action === 'waitlist_update' || $action === 'waitlist_delete') {
+        $id = (string) ($in['id'] ?? '');
+        $store->locked(function (Store $s) use ($action, $id, $in) {
+            $wl = $s->waitlist();
+            if ($action === 'waitlist_delete') {
+                $wl = array_filter($wl, fn ($w) => ($w['id'] ?? '') !== $id);
+            } else {
+                foreach ($wl as &$w) {
+                    if (($w['id'] ?? '') !== $id) {
+                        continue;
+                    }
+                    if (in_array($in['status'] ?? '', ['waiting', 'contacted', 'converted', 'declined'], true)) {
+                        $w['status'] = $in['status'];
+                    }
+                    if (array_key_exists('notes', $in)) {
+                        $w['notes'] = clean_text($in['notes'], 300);
+                    }
+                    $w['updated_at'] = date('c');
+                }
+                unset($w);
+            }
+            $s->saveWaitlist($wl);
         });
         json_response(snapshot($store));
     }
