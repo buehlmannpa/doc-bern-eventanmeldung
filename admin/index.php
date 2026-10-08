@@ -100,17 +100,23 @@ $base  = e(base_path());
         <div class="brand"><?php if (cfg('club.logo')): ?><img src="<?= $asset((string) cfg('club.logo')) ?>" alt="<?= e(cfg('club.name')) ?>" class="brand-logo"><?php else: ?><span class="brand-mark">DOC</span><?php endif; ?><span class="brand-text">CMS · <?= e(cfg('event.title')) ?></span></div>
         <div class="top-actions">
             <span class="status-pill" id="status-pill">…</span>
-            <a class="btn btn-glass btn-sm" href="<?= $base ?>" target="_blank" rel="noopener">Seite ansehen</a>
+            <a class="btn btn-glass btn-sm" href="<?= $base ?>" target="_blank" rel="noopener" title="Anmeldeseite in neuem Tab öffnen">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                <span class="btn-label">Seite ansehen</span>
+            </a>
             <form method="post">
                 <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-                <button class="btn btn-glass btn-sm" name="logout" value="1">Abmelden</button>
+                <button class="btn btn-glass btn-sm" name="logout" value="1" title="Abmelden">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M16 17l5-5-5-5M21 12H9"/></svg>
+                    <span class="btn-label">Abmelden</span>
+                </button>
             </form>
         </div>
     </div>
 </header>
 
 <main class="wrap wrap-wide admin-main">
-    <nav class="tabs" role="tablist">
+    <nav class="tabs" role="tablist" data-count="<?= cfg('features.waitlist') ? 4 : 3 ?>">
         <button role="tab" class="tab" data-tab="overview" aria-selected="true">Übersicht</button>
         <button role="tab" class="tab" data-tab="list" aria-selected="false">Anmeldungen</button>
         <?php if (cfg('features.waitlist')): ?><button role="tab" class="tab" data-tab="waitlist" aria-selected="false">Warteliste</button><?php endif; ?>

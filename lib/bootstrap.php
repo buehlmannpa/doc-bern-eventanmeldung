@@ -7,6 +7,19 @@ declare(strict_types=1);
 const APP_ROOT = __DIR__ . '/..';
 
 $GLOBALS['config'] = require APP_ROOT . '/config/event.php';
+
+// Fehlende Schalter (z.B. aus einer älteren config/event.php) mit sicheren Standardwerten ergänzen,
+// damit nie eine PHP Warnung in die Seite geschrieben wird.
+$GLOBALS['config']['features'] = array_merge([
+    'companion'    => false,
+    'children'     => false,
+    'max_children' => 8,
+    'alt_menu'     => false,
+    'payment'      => false,
+    'calendar'     => true,
+    'waitlist'     => false,
+], is_array($GLOBALS['config']['features'] ?? null) ? $GLOBALS['config']['features'] : []);
+$GLOBALS['config']['roles'] = is_array($GLOBALS['config']['roles'] ?? null) ? $GLOBALS['config']['roles'] : [];
 date_default_timezone_set(cfg('timezone', 'Europe/Zurich'));
 mb_internal_encoding('UTF-8');
 
