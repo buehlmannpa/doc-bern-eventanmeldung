@@ -265,7 +265,7 @@ $base     = e(base_path());
             </div>
             <?php endif; ?>
 
-            <div class="summary" id="summary" aria-live="polite"></div>
+            <div class="summary" id="summary" aria-live="polite" <?= ($f['companion'] || $f['children'] || $f['payment']) ? '' : 'hidden' ?>></div>
             <div class="alert alert-error" id="capacity-error" role="alert" hidden></div>
 
             <label class="check">
