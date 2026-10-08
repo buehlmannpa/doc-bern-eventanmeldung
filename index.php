@@ -344,7 +344,7 @@ $base     = e(base_path());
                     <?php if (!empty($n['title'])): ?><strong><?= e($n['title']) ?></strong><?php endif; ?>
                     <?php if (!empty($n['text'])): ?><p><?= e($n['text']) ?></p><?php endif; ?>
                     <?php if (!empty($n['link'])): ?>
-                        <a class="btn btn-primary" href="<?= e($n['link']) ?>"><?= e($n['link_label'] ?: 'Zur Anmeldung') ?></a>
+                        <a class="notice-link" href="<?= e($n['link']) ?>"><?= e($n['link_label'] ?: 'Zur Anmeldung') ?> <span aria-hidden="true">→</span></a>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
