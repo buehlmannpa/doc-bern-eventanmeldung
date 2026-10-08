@@ -460,6 +460,12 @@ fieldset { margin: 0; min-width: 0; }
 .alert-notice { display: grid; gap: 10px; justify-items: start; margin-top: 20px; text-align: left;
   background: var(--notice-bg); border-color: var(--notice-border); color: var(--notice-text); }
 .alert-notice p { margin: 0; }
+.success .alert-notice { margin-bottom: 16px; }
+.notice-link {
+  color: inherit; font-weight: 650;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+}
+.notice-link:hover { text-decoration-thickness: 2px; }
 
 /* --- Status und Erfolg ------------------------------------------------- */
 
