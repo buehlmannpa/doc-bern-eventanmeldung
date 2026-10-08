@@ -7,20 +7,28 @@ require __DIR__ . '/lib/bootstrap.php';
 require __DIR__ . '/lib/register.php';
 
 // Rückfall ohne JavaScript: Formular wurde klassisch abgeschickt
-$post = null;
-$old  = [];
+$post   = null;
+$wlPost = null;
+$old    = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $isWaitlist = ($_POST['form'] ?? '') === 'waitlist';
     try {
-        $post = register_attempt(form_post_to_input($_POST));
+        $result = $isWaitlist ? waitlist_attempt(waitlist_post_to_input($_POST)) : register_attempt(form_post_to_input($_POST));
     } catch (Throwable $ex) {
         error_log('[anmeldung] ' . $ex->getMessage());
-        $post = ['ok' => false, 'error' => 'Technischer Fehler. Bitte versuche es später erneut.'];
+        $result = ['ok' => false, 'error' => 'Technischer Fehler. Bitte versuche es später erneut.'];
     }
-    if (!$post['ok']) {
+    if ($isWaitlist) {
+        $wlPost = $result;
+    } else {
+        $post = $result;
+    }
+    if (!$result['ok']) {
         $old = array_map(fn ($v) => is_string($v) ? $v : '', $_POST);
     }
 }
 $done   = $post && $post['ok'];
+$wlDone = $wlPost && $wlPost['ok'];
 $fields = $post['fields'] ?? [];
 
 $store  = store();
@@ -35,11 +43,16 @@ $menuAlt  = cfg('menu.alternative', []);
 $hasMenu  = !empty($menuStd['courses']) || ($f['alt_menu'] && !empty($menuAlt['courses']));
 $theme    = preg_replace('/[^a-z0-9\-]/i', '', (string) cfg('theme', ''));
 $timeText = cfg('event.start') . ' bis ' . cfg('event.end') . ' Uhr';
-$twintQr  = (string) cfg('twint.qr', '');
+$twintQr  = cfg('features.payment') ? twint_qr_path() : '';
+$terms    = payment_terms_text();
+$locName  = trim((string) cfg('event.location', ''));
+$locAddr  = trim((string) cfg('event.address', ''));
+$locUrl   = trim((string) cfg('event.location_url', ''));
 $pct      = $status['capacity'] > 0 ? min(100, round($status['taken'] / $status['capacity'] * 100)) : 100;
 $contact  = (string) cfg('club.contact_email', '');
 $paused   = $status['status'] === 'paused' && !$done;
 $closed   = !in_array($status['status'], ['open', 'paused'], true) && !$done;
+$waitlist = $status['waitlist'] && !$done;
 $asset    = fn (string $p) => e(asset_url($p));
 $base     = e(base_path());
 ?>
@@ -96,13 +109,26 @@ $base     = e(base_path());
             <span>
                 <strong data-state-title><?= $status['status'] === 'deadline' ? 'Anmeldung geschlossen' : 'Ausgebucht' ?></strong>
                 <span data-state-message><?= e($status['message']) ?></span>
+                <a href="#warteliste" class="btn btn-banner" id="banner-waitlist" <?= $waitlist ? '' : 'hidden' ?>>Auf die Warteliste</a>
             </span>
         </div>
         <?php if (cfg('event.subtitle')): ?><p class="lead"><?= e(cfg('event.subtitle')) ?></p><?php endif; ?>
         <ul class="facts">
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3M17 2v3M3.5 9h17M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg><?= e(format_date_long((string) cfg('event.date'))) ?></li>
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><?= e($timeText) ?></li>
-            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg><?= e(cfg('event.location')) ?><?= cfg('event.address') ? ', ' . e(cfg('event.address')) : '' ?></li>
+            <?php if ($locName !== '' || $locAddr !== ''): ?>
+            <li class="fact-location">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+                <span class="loc">
+                    <?php if ($locUrl !== ''): ?>
+                        <a href="<?= e($locUrl) ?>" target="_blank" rel="noopener noreferrer" class="loc-name"><?= e($locName) ?><svg class="ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span class="sr-only"> (öffnet in neuem Tab)</span></a>
+                    <?php else: ?>
+                        <strong class="loc-name"><?= e($locName) ?></strong>
+                    <?php endif; ?>
+                    <?php if ($locAddr !== ''): ?><span class="loc-addr"><?= e($locAddr) ?></span><?php endif; ?>
+                </span>
+            </li>
+            <?php endif; ?>
         </ul>
         <?php if (cfg('event.description')): ?><p class="desc"><?= nl2br(e(cfg('event.description'))) ?></p><?php endif; ?>
         <div class="hero-actions" id="cta" <?= $closed ? 'hidden' : '' ?>>
@@ -173,6 +199,7 @@ $base     = e(base_path());
                 </ul>
                 <p class="muted">Bezahlung bequem per TWINT: QR Code in der TWINT App scannen und den Betrag für alle angemeldeten Personen überweisen.</p>
                 <?php if (cfg('twint.note')): ?><p class="muted"><?= e(cfg('twint.note')) ?></p><?php endif; ?>
+                <?php if ($terms): ?><p class="terms"><?= e($terms) ?></p><?php endif; ?>
             </div>
             <?php if ($twintQr): ?>
                 <figure class="qr">
@@ -185,8 +212,8 @@ $base     = e(base_path());
     <?php endif; ?>
 
     <!-- Anmeldung -->
-    <section class="glass" id="anmeldung" <?= $closed ? 'hidden' : '' ?>>
-        <form id="reg-form" method="post" action="<?= $base ?>#anmeldung" novalidate <?= $done ? 'hidden' : '' ?>>
+    <section class="glass" id="anmeldung" <?= ($closed && !$waitlist && !$wlDone) ? 'hidden' : '' ?>>
+        <form id="reg-form" method="post" action="<?= $base ?>#anmeldung" novalidate <?= ($done || $closed || $wlDone) ? 'hidden' : '' ?>>
             <h2>Anmeldung</h2>
 
             <div class="alert alert-error js-warning" id="js-warning" role="alert">
@@ -238,7 +265,7 @@ $base     = e(base_path());
             </div>
             <?php endif; ?>
 
-            <div class="summary" id="summary" aria-live="polite"></div>
+            <div class="summary" id="summary" aria-live="polite" <?= ($f['companion'] || $f['children'] || $f['payment']) ? '' : 'hidden' ?>></div>
             <div class="alert alert-error" id="capacity-error" role="alert" hidden></div>
 
             <label class="check">
@@ -255,6 +282,41 @@ $base     = e(base_path());
 
             <p class="muted small center-text">Bereits angemeldet? Änderungen oder Abmeldungen bitte mit dem Vorstand besprechen<?php if ($contact): ?>: <a href="mailto:<?= e($contact) ?>"><?= e($contact) ?></a><?php else: ?>.<?php endif; ?></p>
         </form>
+
+        <?php if ($f['waitlist'] ?? false): ?>
+        <!-- Warteliste -->
+        <div id="warteliste" class="waitlist" <?= ($waitlist && !$wlDone) ? '' : 'hidden' ?>>
+            <h2>Warteliste</h2>
+            <p class="muted">Der Anlass ist ausgebucht. Trag dich auf die Warteliste ein: Wird ein Platz frei (z.B. weil eine Anmeldung nicht rechtzeitig bezahlt wurde), melden wir uns in der Reihenfolge der Eintragung per E-Mail bei dir.</p>
+            <form id="wl-form" method="post" action="<?= $base ?>#warteliste" novalidate>
+                <input type="hidden" name="form" value="waitlist">
+                <div class="grid-2">
+                    <label class="field"><span>Vorname</span><input type="text" name="wl_first" autocomplete="given-name" required maxlength="60" value="<?= e($old['wl_first'] ?? '') ?>"></label>
+                    <label class="field"><span>Nachname</span><input type="text" name="wl_last" autocomplete="family-name" required maxlength="60" value="<?= e($old['wl_last'] ?? '') ?>"></label>
+                </div>
+                <div class="grid-2">
+                    <label class="field"><span>E-Mail</span><input type="email" name="wl_email" autocomplete="email" inputmode="email" required maxlength="120" value="<?= e($old['wl_email'] ?? '') ?>"></label>
+                    <?php if ($f['companion'] || $f['children']): ?>
+                    <label class="field"><span>Anzahl Personen (inkl. Kinder)</span><input type="number" name="wl_persons" min="1" max="<?= 1 + ($f['companion'] ? 1 : 0) + (int) ($f['max_children'] ?? 8) ?>" value="<?= e($old['wl_persons'] ?? '1') ?>" inputmode="numeric"></label>
+                    <?php endif; ?>
+                </div>
+                <label class="check">
+                    <input type="checkbox" name="wl_consent" required>
+                    <span>Ich bin einverstanden, dass meine Angaben für die Warteliste dieses Anlasses gespeichert werden.</span>
+                </label>
+                <label class="hp" aria-hidden="true">Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+                <div class="alert alert-error" id="wl-error" role="alert" <?= ($wlPost && !$wlPost['ok']) ? '' : 'hidden' ?>><?= e($wlPost['error'] ?? '') ?></div>
+                <button type="submit" class="btn btn-primary btn-block" id="wl-submit">Auf die Warteliste setzen</button>
+            </form>
+        </div>
+        <div id="wl-success" class="success" <?= $wlDone ? '' : 'hidden' ?> tabindex="-1">
+            <div class="success-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+            <h2>Du stehst auf der Warteliste</h2>
+            <p class="wl-position">Position <strong id="wl-position"><?= $wlDone ? (int) $wlPost['position'] : '' ?></strong></p>
+            <p class="muted">Sobald ein Platz frei wird, melden wir uns in der Reihenfolge der Warteliste per E-Mail bei dir. Der Eintrag ist noch keine Anmeldung.</p>
+            <p class="muted small" id="wl-mail-info" <?= !empty($wlPost['mailSent']) ? '' : 'hidden' ?>>Eine Bestätigung wurde an <span id="wl-mail"><?= e($wlPost['email'] ?? '') ?></span> gesendet.</p>
+        </div>
+        <?php endif; ?>
 
         <div id="success" class="success" <?= $done ? '' : 'hidden' ?> tabindex="-1">
             <div class="success-icon" aria-hidden="true">
@@ -273,6 +335,7 @@ $base     = e(base_path());
                         <img src="<?= $asset($twintQr) ?>" alt="TWINT QR Code für die Bezahlung" width="200" height="200">
                     <?php endif; ?>
                     <p class="muted small">Der QR Code bleibt oben unter «Kosten und Bezahlung» jederzeit verfügbar.</p>
+                    <?php if ($terms): ?><p class="terms"><?= e($terms) ?></p><?php endif; ?>
                 </div>
             <?php endif; ?>
 

@@ -12,6 +12,7 @@
   const fmtDate = (iso) => new Date(iso).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const relLabel = { main: 'Hauptperson', companion: 'Weitere Person', child: 'Kind' };
 
+  const groups = !!(f.companion || f.children); // mehrere Personen pro Anmeldung möglich
   let data = null;
   const view = { search: '', filter: 'all' };
 
@@ -47,10 +48,22 @@
   $$('.tab').forEach((tab) => tab.addEventListener('click', () => {
     $$('.tab').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
     $$('.tab-panel').forEach((p) => { p.hidden = p.id !== `tab-${tab.dataset.tab}`; });
-    try { sessionStorage.setItem('docTab', tab.dataset.tab); } catch (_) { /* ignorieren */ }
+    try { sessionStorage.setItem(`docTab:${cfg.api}`, tab.dataset.tab); } catch (_) { /* ignorieren */ }
+    if (tab.dataset.tab === 'overview' && data) renderOverview(); // Diagramm an sichtbare Breite anpassen
   }));
+  let resizeTimer = null;
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (data && Math.abs(window.innerWidth - lastWidth) > 40 && !$('#tab-overview').hidden) {
+        lastWidth = window.innerWidth;
+        renderOverview();
+      }
+    }, 200);
+  });
   try {
-    const saved = sessionStorage.getItem('docTab');
+    const saved = sessionStorage.getItem(`docTab:${cfg.api}`);
     if (saved) $(`.tab[data-tab="${saved}"]`)?.click();
   } catch (_) { /* ignorieren */ }
 
@@ -62,8 +75,15 @@
     renderPill();
     renderOverview();
     renderList();
+    renderWaitlist();
     renderSettings();
   }
+
+  const payInfo = {
+    definitive: ['Definitiv', 'ok', 'Bezahlt oder kostenlos'],
+    pending: ['Provisorisch', 'pending', 'Zahlung noch offen'],
+    overdue: ['Überfällig', 'overdue', 'Zahlung nach Anmeldeschluss nicht eingegangen'],
+  };
 
   const statusText = {
     open: ['Anmeldung offen', 'ok'],
@@ -111,7 +131,10 @@
       series.push({ key, label: d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }), value: byDay.get(key) || 0 });
     }
 
-    const W = 640, H = 220, pl = 32, pr = 8, pt = 12, pb = 28;
+    // Zeichenbreite = tatsächliche Breite, damit Schrift und Balken auf jedem Bildschirm gleich gross sind
+    const avail = ($('#tab-overview').clientWidth || Math.min(window.innerWidth - 32, 1200));
+    const W = Math.max(260, Math.round(avail - (window.innerWidth < 640 ? 40 : 72)));
+    const H = window.innerWidth < 640 ? 180 : 220, pl = 32, pr = 8, pt = 12, pb = 28;
     const max = Math.max(1, ...series.map((s) => s.value));
     const step = Math.max(1, Math.ceil(max / 4));
     const top = step * Math.ceil(max / step);
@@ -183,15 +206,20 @@
     const paid = data.registrations.filter((r) => r.paid).reduce((a, r) => a + r.total, 0);
     const pct = s.capacity ? Math.min(100, Math.round((s.taken / s.capacity) * 100)) : 100;
 
-    const kpis = [
-      ['Belegte Plätze', `${s.taken}<small> / ${s.capacity}</small>`, `${s.remaining} frei`],
-      ['Anmeldungen', data.registrations.length, 'Gruppen'],
-      ['Erwachsene', adults, ''],
-    ];
-    if (f.children) kpis.push(['Kinder', kids, '']);
+    const kpis = [['Belegte Plätze', `${s.taken}<small> / ${s.capacity}</small>`, `${s.remaining} frei`]];
+    if (groups) kpis.push(['Anmeldungen', data.registrations.length, 'Gruppen']);
+    if (f.children) kpis.push(['Personen', `${adults}<small> / </small>${kids}`, 'Erwachsene / Kinder']);
     if (f.payment) {
-      kpis.push(['Betrag total', chf(total), '']);
-      kpis.push(['Bezahlt', chf(paid), `offen ${chf(total - paid)}`]);
+      const defin = data.registrations.filter((r) => r.payState === 'definitive').reduce((a, r) => a + r.persons.length, 0);
+      const overdue = data.registrations.filter((r) => r.payState === 'overdue').reduce((a, r) => a + r.persons.length, 0);
+      kpis.push(['Definitiv', defin, overdue ? `${overdue} überfällig` : `${s.taken - defin} provisorisch`]);
+      kpis.push(['Bezahlt', chf(paid), `von ${chf(total)}`]);
+    }
+    if (f.waitlist) kpis.push(['Warteliste', s.waiting, s.waiting === 1 ? 'Eintrag' : 'Einträge']);
+    if (kpis.length < 4) {
+      const weekAgo = Date.now() - 7 * 864e5;
+      const recent = data.registrations.filter((r) => new Date(r.created_at).getTime() >= weekAgo).reduce((a, r) => a + r.persons.length, 0);
+      kpis.push(['Neu (7 Tage)', recent, recent === 1 ? 'Person' : 'Personen']);
     }
 
     const cards = [];
@@ -204,17 +232,19 @@
         { label: cfg.menu.alternative, value: persons.filter((p) => p.menu === 'alternative').length },
       ])]);
     }
-    cards.push(['Personen nach Rolle', barList([
-      { label: 'Mitglieder und Gäste', value: persons.filter((p) => !p.role).length },
-      ...Object.entries(roles).map(([k, r]) => ({ label: r.label, value: persons.filter((p) => p.role === k).length, swatch: r.color })),
-    ])]);
+    if (Object.keys(roles).length) {
+      cards.push(['Personen nach Rolle', barList([
+        { label: groups ? 'Mitglieder und Gäste' : 'Mitglieder', value: persons.filter((p) => !p.role).length },
+        ...Object.entries(roles).map(([k, r]) => ({ label: r.label, value: persons.filter((p) => p.role === k).length, swatch: r.color })),
+      ])]);
+    }
     if (f.payment) {
       cards.push(['Bezahlstatus', barList([{ label: 'Bezahlt', value: paid }, { label: 'Offen', value: total - paid }], { money: true })]);
     }
 
     const el = $('#tab-overview');
     el.innerHTML = `
-      <div class="kpis">${kpis.map(([l, v, sub]) => `
+      <div class="kpis" data-cols="${Math.min(kpis.length, 6)}">${kpis.map(([l, v, sub]) => `
         <div class="glass kpi"><span class="kpi-label">${l}</span><strong class="kpi-value">${v}</strong>${sub ? `<span class="kpi-sub">${sub}</span>` : ''}</div>`).join('')}
       </div>
       <div class="glass">
@@ -222,7 +252,7 @@
         <div class="meter"><div class="meter-fill" style="width:${pct}%"></div></div>
         <p class="capacity-foot">${esc((statusText[s.status] || [''])[0])}${s.message ? ` · ${esc(s.message)}` : ''}</p>
       </div>
-      <div class="charts">
+      <div class="charts" data-count="${cards.length}">
         ${cards.map(([t, body]) => `<div class="glass chart-card"><h3>${t}</h3>${body}</div>`).join('')}
         <div class="glass chart-card chart-wide"><h3>Angemeldete Personen pro Tag</h3>${dailyChart(data.registrations)}</div>
       </div>`;
@@ -238,6 +268,8 @@
       if (!hay.includes(q)) return false;
     }
     if (view.filter === 'unpaid') return !r.paid && r.total > 0;
+    if (view.filter === 'pending') return r.payState === 'pending';
+    if (view.filter === 'overdue') return r.payState === 'overdue';
     if (view.filter === 'children') return r.persons.some((p) => p.type === 'child');
     if (view.filter === 'alt') return r.persons.some((p) => p.menu === 'alternative');
     if (view.filter.startsWith('role:')) return r.persons.some((p) => p.role === view.filter.slice(5));
@@ -251,7 +283,10 @@
     Object.entries(roles).forEach(([k, r]) => filters.push([`role:${k}`, r.label]));
     if (f.children) filters.push(['children', 'Mit Kindern']);
     if (f.alt_menu) filters.push(['alt', cfg.menu.alternative]);
-    if (f.payment) filters.push(['unpaid', 'Unbezahlt']);
+    if (f.payment) {
+      filters.push(['pending', 'Provisorisch']);
+      filters.push(['overdue', 'Zahlung überfällig']);
+    }
 
     const list = data.registrations.filter(matches).sort((a, b) => b.created_at.localeCompare(a.created_at));
 
@@ -264,14 +299,14 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Anmeldung hinzufügen</button>
           <a class="btn btn-glass" href="${cfg.api}?action=excel&csrf=${encodeURIComponent(cfg.csrf)}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg> Excel Export</a>
-          <a class="btn btn-glass" href="${cfg.api}?action=export&csrf=${encodeURIComponent(cfg.csrf)}">CSV</a>
+          <a class="btn btn-glass" href="${cfg.api}?action=export&csrf=${encodeURIComponent(cfg.csrf)}">CSV Export</a>
         </div>
-        <div class="chips" role="group" aria-label="Filter">
+        ${filters.length > 1 ? `<div class="chips" role="group" aria-label="Filter">
           ${filters.map(([k, l]) => `<button class="chip" data-filter="${esc(k)}" aria-pressed="${view.filter === k}">${esc(l)}</button>`).join('')}
-        </div>
+        </div>` : ''}
         ${Object.keys(roles).length ? `<div class="legend">${Object.values(roles).map((r) => `<span><i class="swatch" style="background:${esc(r.color)}"></i>${esc(r.label)}${r.free ? ' (kostenlos)' : ''}</span>`).join('')}</div>` : ''}
       </div>
-      <p class="muted small list-count">${list.length} von ${data.registrations.length} Anmeldungen, ${list.reduce((a, r) => a + r.persons.length, 0)} Personen</p>
+      <p class="muted small list-count">${list.length} von ${data.registrations.length} Anmeldungen${groups ? `, ${list.reduce((a, r) => a + r.persons.length, 0)} Personen` : ''}</p>
       <div class="reg-list">
         ${list.length ? list.map(regCard).join('') : '<div class="glass empty">Keine Anmeldungen gefunden.</div>'}
       </div>`;
@@ -306,25 +341,47 @@
 
   function regCard(r) {
     const main = r.persons[0] || {};
+    const roleOf = (p) => roles[p.role];
+    const tagsFor = (p, withRelation) => {
+      const role = roleOf(p);
+      return [
+        withRelation ? `<span class="tag">${relLabel[p.relation] || ''}</span>` : '',
+        role ? `<span class="tag tag-role" style="--role:${esc(role.color)}">${esc(role.label)}</span>` : '',
+        f.alt_menu ? `<span class="tag ${p.menu === 'alternative' ? 'tag-alt' : ''}">${esc(cfg.menu[p.menu] || p.menu)}</span>` : '',
+      ].join('');
+    };
     const personRow = (p) => {
-      const role = roles[p.role];
+      const role = roleOf(p);
       return `<li class="person ${role ? 'has-role' : ''}" ${role ? `style="--role:${esc(role.color)}"` : ''}>
         <span class="p-name">${esc(p.first)} ${esc(p.last)}</span>
-        <span class="p-tags">
-          <span class="tag">${relLabel[p.relation] || ''}</span>
-          ${role ? `<span class="tag tag-role">${esc(role.label)}</span>` : ''}
-          ${f.alt_menu ? `<span class="tag ${p.menu === 'alternative' ? 'tag-alt' : ''}">${esc(cfg.menu[p.menu] || p.menu)}</span>` : ''}
-        </span>
+        <span class="p-tags">${tagsFor(p, true)}</span>
         ${f.payment ? `<span class="p-price">${chf(priceFor(p))}</span>` : ''}
       </li>`;
     };
+
+    // Ohne Begleitperson und Kinder: kompakte Karte ohne Personenliste
+    const compact = !groups && r.persons.length === 1;
+    const mainRole = compact ? roleOf(main) : null;
+    const pay = f.payment ? payInfo[r.payState] : null;
+
+    const foot = [
+      groups ? `<span>${r.persons.length} ${r.persons.length === 1 ? 'Person' : 'Personen'}</span>` : '',
+      f.payment ? `<strong>${chf(r.total)}</strong><label class="switch"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : '',
+      r.payState === 'overdue' ? '<p class="note note-overdue">Zahlung nach Anmeldeschluss nicht eingegangen. Platz freigeben (Anmeldung löschen) und der nächsten Person auf der Warteliste anbieten.</p>' : '',
+      r.notes ? `<p class="note">${esc(r.notes)}</p>` : '',
+    ].join('');
+
     return `
-      <article class="glass reg">
+      <article class="glass reg ${mainRole ? 'has-role' : ''}" ${mainRole ? `style="--role:${esc(mainRole.color)}"` : ''}>
         <header class="reg-head">
-          <div>
+          <div class="reg-title">
             <h3>${esc(main.first)} ${esc(main.last)}</h3>
-            <p class="muted small">${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a> · ` : ''}${fmtDate(r.created_at)}${r.source === 'admin' ? ' · <span class="tag">manuell</span>' : ''}</p>
+            ${pay ? `<span class="pay-badge is-${pay[1]}" title="${esc(pay[2])}">${pay[0]}</span>` : ''}
+          </div>
+          <div class="reg-meta">
+            <p class="muted small">${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a> · ` : ''}${fmtDate(r.created_at)}${r.source === 'admin' ? ' · manuell erfasst' : ''}</p>
             ${data.mailEnabled && r.email ? `<p class="muted small mail-state">${r.mailed_at ? `✓ Bestätigung gesendet ${fmtDate(r.mailed_at)}` : 'Keine Bestätigung gesendet'}</p>` : ''}
+            ${compact && tagsFor(main, false) ? `<div class="reg-tags">${tagsFor(main, false)}</div>` : ''}
           </div>
           <div class="reg-actions">
             ${data.mailEnabled && r.email ? `<button class="icon-btn" data-mail="${esc(r.id)}" aria-label="Bestätigung erneut senden" title="Bestätigung erneut senden">
@@ -335,13 +392,8 @@
               <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
           </div>
         </header>
-        <ul class="persons">${r.persons.map(personRow).join('')}</ul>
-        <footer class="reg-foot">
-          <span>${r.persons.length} ${r.persons.length === 1 ? 'Person' : 'Personen'}</span>
-          ${f.payment ? `<strong>${chf(r.total)}</strong>
-            <label class="switch"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : ''}
-          ${r.notes ? `<p class="note">${esc(r.notes)}</p>` : ''}
-        </footer>
+        ${compact ? '' : `<ul class="persons">${r.persons.map(personRow).join('')}</ul>`}
+        ${foot ? `<footer class="reg-foot">${foot}</footer>` : ''}
       </article>`;
   }
 
@@ -360,17 +412,81 @@
     toast(out.ok ? 'Anmeldung gelöscht.' : out.error, !out.ok);
   }
 
+  // --- Warteliste --------------------------------------------------------
+
+  const wlStatus = { waiting: 'Wartend', contacted: 'Kontaktiert', converted: 'Übernommen', declined: 'Abgesagt' };
+
+  function renderWaitlist() {
+    const el = $('#tab-waitlist');
+    if (!el || el.contains(document.activeElement)) return; // Eingaben nicht überschreiben
+    const list = data.waitlist || [];
+    const open = list.filter((w) => w.position);
+    const done = list.filter((w) => !w.position);
+    const freeNow = data.status.remaining;
+
+    const row = (w) => `
+      <article class="glass wl-row ${w.position ? '' : 'is-done'}">
+        <div class="wl-pos">${w.position ? w.position : '–'}</div>
+        <div class="wl-main">
+          <h3>${esc(w.first)} ${esc(w.last)} <span class="tag">${w.persons} ${w.persons === 1 ? 'Person' : 'Personen'}</span></h3>
+          <p class="muted small"><a href="mailto:${esc(w.email)}">${esc(w.email)}</a> · eingetragen ${fmtDate(w.created_at)}</p>
+          <label class="field wl-note"><span class="sr-only">Notiz</span>
+            <input type="text" data-wl-note="${esc(w.id)}" value="${esc(w.notes || '')}" placeholder="Notiz, z.B. am 03.12. angefragt" maxlength="300"></label>
+        </div>
+        <div class="wl-actions">
+          <label class="field"><span class="sr-only">Status</span>
+            <select data-wl-status="${esc(w.id)}">${Object.entries(wlStatus).map(([k, l]) => `<option value="${k}" ${w.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          ${w.position ? `<button class="btn btn-primary btn-sm" data-wl-convert="${esc(w.id)}">Anmeldung übernehmen</button>` : ''}
+          <button class="icon-btn danger" data-wl-delete="${esc(w.id)}" aria-label="Löschen" title="Löschen">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+        </div>
+      </article>`;
+
+    el.innerHTML = `
+      <div class="glass toolbar">
+        <h2>Warteliste</h2>
+        <p class="muted">${open.length} offene ${open.length === 1 ? 'Eintrag' : 'Einträge'} in der Reihenfolge der Eintragung.
+          ${freeNow > 0 ? `<strong>Aktuell ${freeNow === 1 ? 'ist 1 Platz' : `sind ${freeNow} Plätze`} frei.</strong>` : 'Aktuell sind keine Plätze frei.'}
+          Solange jemand auf der Warteliste steht, bleibt die Anmeldung für neue Personen geschlossen.</p>
+        <p class="muted small">Ablauf: Person kontaktieren und Status auf «Kontaktiert» setzen. Sagt sie zu, mit «Anmeldung übernehmen» erfassen. Sagt sie ab, Status «Abgesagt».</p>
+      </div>
+      <div class="wl-list">${open.length ? open.map(row).join('') : '<div class="glass empty">Niemand auf der Warteliste.</div>'}</div>
+      ${done.length ? `<details class="wl-done"><summary>Erledigt (${done.length})</summary><div class="wl-list">${done.map(row).join('')}</div></details>` : ''}`;
+
+    $$('[data-wl-status]', el).forEach((sel) => sel.addEventListener('change', async () => {
+      const out = await api('waitlist_update', { id: sel.dataset.wlStatus, status: sel.value });
+      toast(out.ok ? 'Status gespeichert.' : out.error, !out.ok);
+    }));
+    $$('[data-wl-note]', el).forEach((inp) => inp.addEventListener('change', async () => {
+      const out = await api('waitlist_update', { id: inp.dataset.wlNote, notes: inp.value });
+      toast(out.ok ? 'Notiz gespeichert.' : out.error, !out.ok);
+    }));
+    $$('[data-wl-delete]', el).forEach((b) => b.addEventListener('click', async () => {
+      const w = list.find((x) => x.id === b.dataset.wlDelete);
+      if (!confirm(`${w.first} ${w.last} von der Warteliste löschen?`)) return;
+      const out = await api('waitlist_delete', { id: w.id });
+      toast(out.ok ? 'Eintrag gelöscht.' : out.error, !out.ok);
+    }));
+    $$('[data-wl-convert]', el).forEach((b) => b.addEventListener('click', () => {
+      openEditor(null, list.find((x) => x.id === b.dataset.wlConvert));
+    }));
+  }
+
   // --- Editor -----------------------------------------------------------
 
-  function openEditor(reg) {
+  function openEditor(reg, fromWaitlist = null) {
     const dlg = $('#editor');
+    if (fromWaitlist) {
+      reg = null;
+    }
     const model = {
+      waitlistId: fromWaitlist?.id || '',
       id: reg?.id || '',
-      email: reg?.email || '',
+      email: reg?.email || fromWaitlist?.email || '',
       paid: !!reg?.paid,
       notes: reg?.notes || '',
       sendMail: !reg,
-      main: reg?.persons.find((p) => p.relation === 'main') || { first: '', last: '', menu: 'standard', role: '' },
+      main: reg?.persons.find((p) => p.relation === 'main') || { first: fromWaitlist?.first || '', last: fromWaitlist?.last || '', menu: 'standard', role: '' },
       companion: reg?.persons.find((p) => p.relation === 'companion') || null,
       children: reg?.persons.filter((p) => p.relation === 'child') || [],
     };
@@ -385,12 +501,12 @@
           <label class="field"><span>Vorname</span><input name="${key}.first" value="${esc(p.first)}" required maxlength="60"></label>
           <label class="field"><span>Nachname</span><input name="${key}.last" value="${esc(p.last)}" required maxlength="60"></label>
         </div>
-        <div class="grid-2">
+        ${Object.keys(roles).length || f.alt_menu ? `<div class="grid-2">
           ${Object.keys(roles).length ? `<label class="field"><span>Rolle</span><select name="${key}.role">${roleOptions(p.role)}</select></label>` : ''}
           ${f.alt_menu ? `<label class="field"><span>Menü</span><select name="${key}.menu">
             <option value="standard" ${p.menu !== 'alternative' ? 'selected' : ''}>${esc(cfg.menu.standard)}</option>
             <option value="alternative" ${p.menu === 'alternative' ? 'selected' : ''}>${esc(cfg.menu.alternative)}</option></select></label>` : ''}
-        </div>
+        </div>` : ''}
       </fieldset>`;
 
     const readForm = () => {
@@ -414,14 +530,15 @@
             <button type="button" class="icon-btn" data-close aria-label="Schliessen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
           </header>
           <div class="dlg-body">
-            ${personFields('main', model.main, 'Hauptperson', false)}
+            ${fromWaitlist ? `<div class="alert alert-notice">Aus der Warteliste: ${esc(fromWaitlist.first)} ${esc(fromWaitlist.last)} hat sich für <strong>${fromWaitlist.persons} ${fromWaitlist.persons === 1 ? 'Person' : 'Personen'}</strong> eingetragen. Weitere Person und Kinder bitte unten ergänzen.</div>` : ''}
+            ${personFields('main', model.main, groups ? 'Hauptperson' : 'Person', false)}
             <label class="field"><span>E-Mail</span><input type="email" name="email" value="${esc(model.email)}" maxlength="120"></label>
             ${model.companion ? personFields('companion', model.companion, 'Weitere Person', true) : ''}
             ${model.children.map((c, i) => personFields(`child${i}`, c, `Kind ${i + 1}`, true)).join('')}
-            <div class="add-row">
+            ${groups ? `<div class="add-row">
               ${f.companion && !model.companion ? '<button type="button" class="btn btn-glass" data-add="companion">+ Weitere Person</button>' : ''}
               ${f.children ? '<button type="button" class="btn btn-glass" data-add="child">+ Kind</button>' : ''}
-            </div>
+            </div>` : ''}
             ${f.payment ? `<label class="switch"><input type="checkbox" name="paid" ${model.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : ''}
             ${data.mailEnabled ? `<label class="switch"><input type="checkbox" name="sendMail" ${model.sendMail ? 'checked' : ''}><span></span>${model.id ? 'Bestätigung erneut senden' : 'Bestätigung per E-Mail senden'}</label>` : ''}
             <label class="field"><span>Notiz (nur intern)</span><textarea name="notes" maxlength="500">${esc(model.notes)}</textarea></label>
@@ -457,7 +574,7 @@
         id: model.id, email: model.email, paid: model.paid, notes: model.notes,
         main: model.main, companion: model.companion, children: model.children,
       };
-      const out = await api('save', { registration: payload, force, sendMail: model.sendMail && !!model.email });
+      const out = await api('save', { registration: payload, force, sendMail: model.sendMail && !!model.email, waitlistId: model.waitlistId });
       if (out.ok) {
         dlg.close();
         if (out.mailSent === false) toast('Gespeichert, aber die Bestätigung konnte nicht versendet werden.', true);
@@ -507,12 +624,12 @@
             </label>`).join('')}
         </div>
         <label class="field"><span>Eigene Meldung (optional, ersetzt den Standardtext)</span>
-          <textarea name="message" maxlength="300" placeholder="z.B. Das Weihnachtsessen ist ausgebucht. Wir freuen uns auf nächstes Jahr!">${esc(st.message)}</textarea></label>
+          <textarea name="message" maxlength="300" placeholder="z.B. Der Anlass ist ausgebucht. Wir freuen uns auf das nächste Mal!">${esc(st.message)}</textarea></label>
 
         <h2>Limit</h2>
         <label class="field"><span>Maximale Anzahl Personen (leer = Wert aus der Konfiguration: ${data.defaultCap})</span>
           <input type="number" name="capacity_override" min="0" max="10000" inputmode="numeric" value="${st.capacity_override ?? ''}" placeholder="${data.defaultCap}"></label>
-        <p class="muted small">Aktuell angemeldet: ${data.status.taken} Personen. Erwachsene und Kinder zählen je als ein Platz.</p>
+        <p class="muted small">Aktuell angemeldet: ${data.status.taken} ${data.status.taken === 1 ? 'Person' : 'Personen'}.${f.children ? ' Erwachsene und Kinder zählen je als ein Platz.' : ''}</p>
 
         <button class="btn btn-primary">Einstellungen speichern</button>
       </form>`;

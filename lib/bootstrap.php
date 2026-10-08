@@ -7,6 +7,19 @@ declare(strict_types=1);
 const APP_ROOT = __DIR__ . '/..';
 
 $GLOBALS['config'] = require APP_ROOT . '/config/event.php';
+
+// Fehlende Schalter (z.B. aus einer älteren config/event.php) mit sicheren Standardwerten ergänzen,
+// damit nie eine PHP Warnung in die Seite geschrieben wird.
+$GLOBALS['config']['features'] = array_merge([
+    'companion'    => false,
+    'children'     => false,
+    'max_children' => 8,
+    'alt_menu'     => false,
+    'payment'      => false,
+    'calendar'     => true,
+    'waitlist'     => false,
+], is_array($GLOBALS['config']['features'] ?? null) ? $GLOBALS['config']['features'] : []);
+$GLOBALS['config']['roles'] = is_array($GLOBALS['config']['roles'] ?? null) ? $GLOBALS['config']['roles'] : [];
 date_default_timezone_set(cfg('timezone', 'Europe/Zurich'));
 mb_internal_encoding('UTF-8');
 
@@ -198,6 +211,21 @@ final class Store
         $this->write('registrations', ['registrations' => array_values($list)]);
     }
 
+    // --- Warteliste -------------------------------------------------------
+
+    /** Einträge der Warteliste in Reihenfolge der Eintragung. */
+    public function waitlist(): array
+    {
+        $list = $this->read('waitlist', ['entries' => []])['entries'] ?? [];
+        usort($list, fn ($a, $b) => strcmp($a['created_at'] ?? '', $b['created_at'] ?? ''));
+        return $list;
+    }
+
+    public function saveWaitlist(array $list): void
+    {
+        $this->write('waitlist', ['entries' => array_values($list)]);
+    }
+
     /** Aktueller Status (manuell im CMS gesetzt). */
     public function state(): array
     {
@@ -249,15 +277,26 @@ function deadline_passed(): bool
     return $ts !== false && time() > $ts;
 }
 
+/** Offene Einträge der Warteliste (noch nicht übernommen). */
+function waitlist_open(array $entries): array
+{
+    return array_values(array_filter($entries, fn ($w) => in_array($w['status'] ?? 'waiting', ['waiting', 'contacted'], true)));
+}
+
 /**
  * Gesamtstatus der Anmeldung.
  * status: open | full | closed | paused | deadline
+ *
+ * Sobald jemand auf der Warteliste steht, bleibt die Anmeldung für neue Personen
+ * geschlossen, auch wenn ein Platz frei wird. Freie Plätze vergibt der Vorstand
+ * in der Reihenfolge der Warteliste.
  */
-function registration_status(array $registrations, array $state): array
+function registration_status(array $registrations, array $state, ?array $waitlist = null): array
 {
-    $cap   = capacity($state);
-    $taken = count_persons($registrations);
-    $mode  = $state['mode'] ?? 'open';
+    $cap     = capacity($state);
+    $taken   = count_persons($registrations);
+    $mode    = $state['mode'] ?? 'open';
+    $waiting = count(waitlist_open($waitlist ?? store()->waitlist()));
 
     if ($mode === 'paused') {
         $status  = 'paused';
@@ -268,12 +307,17 @@ function registration_status(array $registrations, array $state): array
     } elseif (deadline_passed()) {
         $status  = 'deadline';
         $message = 'Der Anmeldeschluss ist vorbei.';
-    } elseif ($taken >= $cap) {
+    } elseif ($taken >= $cap || $waiting > 0) {
         $status  = 'full';
         $message = 'Der Anlass ist ausgebucht. Vielen Dank für dein Interesse!';
     } else {
         $status  = 'open';
         $message = '';
+    }
+
+    $waitlistOpen = (bool) cfg('features.waitlist', false) && in_array($status, ['full', 'closed', 'deadline'], true);
+    if ($waitlistOpen) {
+        $message = rtrim($message, '!. ') . '. Trag dich gerne auf die Warteliste ein.';
     }
 
     return [
@@ -282,7 +326,50 @@ function registration_status(array $registrations, array $state): array
         'capacity'  => $cap,
         'taken'     => $taken,
         'remaining' => max(0, $cap - $taken),
+        'waitlist'  => $waitlistOpen,
+        'waiting'   => $waiting,
     ];
+}
+
+/** Anmeldeschluss als Text, z.B. "Samstag, 28. November 2026, 23:59 Uhr" (leer, wenn keiner gesetzt). */
+function deadline_text(): string
+{
+    $d  = trim((string) cfg('deadline', ''));
+    $ts = $d !== '' ? strtotime($d) : false;
+    return $ts ? format_date_long(date('Y-m-d', $ts)) . ', ' . date('H:i', $ts) . ' Uhr' : '';
+}
+
+/** Hinweis: Anmeldung ist erst nach Zahlung definitiv. */
+function payment_terms_text(): string
+{
+    if (!cfg('features.payment')) {
+        return '';
+    }
+    $until = deadline_text();
+    return 'Die Anmeldung ist erst definitiv, wenn der Betrag ' . ($until !== '' ? "bis zum Anmeldeschluss ($until)" : 'bis zum Anmeldeschluss')
+        . ' bezahlt ist. Ohne Zahlung wird der Platz an die nächste Person auf der Warteliste weitergegeben.';
+}
+
+/**
+ * Zahlungsstatus einer Anmeldung:
+ * definitive = bezahlt oder nichts zu bezahlen, pending = offen, overdue = offen nach Anmeldeschluss
+ */
+function registration_payment_state(array $reg): string
+{
+    if (!cfg('features.payment') || !empty($reg['paid']) || registration_total($reg) <= 0) {
+        return 'definitive';
+    }
+    return deadline_passed() ? 'overdue' : 'pending';
+}
+
+/** Pfad zum TWINT QR Code, falls die Datei vorhanden ist (sonst Platzhalter bzw. leer). */
+function twint_qr_path(bool $allowPlaceholder = true): string
+{
+    $qr = ltrim(trim((string) cfg('twint.qr', '')), '/');
+    if ($qr !== '' && is_file(APP_ROOT . '/' . $qr)) {
+        return $qr;
+    }
+    return $allowPlaceholder ? 'assets/img/twint-qr.svg' : '';
 }
 
 function price_for(array $person): float

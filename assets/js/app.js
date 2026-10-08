@@ -218,7 +218,16 @@ window.addEventListener('error', (ev) => {
       $('[data-state-message]').textContent = s.message;
     }
     $('#cta').hidden = !open;
-    $('#anmeldung').hidden = !open;
+    if (form) form.hidden = !open;
+
+    // Warteliste anbieten, solange ausgebucht bzw. geschlossen
+    const wlDone = $('#wl-success') && !$('#wl-success').hidden;
+    const wlBox = $('#warteliste');
+    if (wlBox) wlBox.hidden = !s.waitlist || wlDone;
+    const bannerBtn = $('#banner-waitlist');
+    if (bannerBtn) bannerBtn.hidden = !s.waitlist || wlDone;
+    $('#anmeldung').hidden = !open && !s.waitlist && !wlDone;
+
     document.body.dataset.state = s.status;
     update();
   }
@@ -350,6 +359,80 @@ window.addEventListener('error', (ev) => {
   }
 
   update();
+
+  // ---------------------------------------------------------------------
+  // Warteliste
+  // ---------------------------------------------------------------------
+
+  const wlForm = document.getElementById('wl-form');
+  wlForm?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    $$('.invalid', wlForm).forEach((el) => el.classList.remove('invalid'));
+    $$('.field-error', wlForm).forEach((el) => el.remove());
+    const errEl = $('#wl-error');
+    errEl.hidden = true;
+
+    const get = (n) => (wlForm.elements[n]?.value || '').trim();
+    const mark = (name, msg) => {
+      const wrap = wlForm.elements[name]?.closest('.field, .check');
+      if (!wrap) return;
+      wrap.classList.add('invalid');
+      if (wrap.classList.contains('field') && msg) {
+        const m = document.createElement('small');
+        m.className = 'field-error';
+        m.textContent = msg;
+        wrap.appendChild(m);
+      }
+    };
+
+    let ok = true;
+    ['wl_first', 'wl_last', 'wl_email'].forEach((n) => { if (!get(n)) { mark(n, 'Pflichtfeld'); ok = false; } });
+    if (get('wl_email') && !wlForm.elements.wl_email.checkValidity()) { mark('wl_email', 'Ungültige E-Mail Adresse'); ok = false; }
+    if (!wlForm.elements.wl_consent.checked) { mark('wl_consent'); ok = false; }
+    if (!ok) {
+      errEl.textContent = 'Bitte fülle alle markierten Felder aus.';
+      errEl.hidden = false;
+      return;
+    }
+
+    const btn = $('#wl-submit');
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${cfg.base}api.php?action=waitlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first: get('wl_first'), last: get('wl_last'), email: get('wl_email'),
+          persons: get('wl_persons') || 1, consent: true, website: get('website'),
+        }),
+      });
+      const out = await res.json().catch(() => ({ ok: false, error: 'Unerwartete Antwort vom Server.' }));
+      if (!out.ok) {
+        Object.entries(out.fields || {}).forEach(([k, m]) => mark(k, m));
+        errEl.textContent = out.error || 'Der Eintrag ist fehlgeschlagen.';
+        errEl.hidden = false;
+        if (out.status) renderStatus(out.status);
+        return;
+      }
+      $('#wl-position').textContent = out.position;
+      if (out.mailSent) {
+        $('#wl-mail').textContent = out.email;
+        $('#wl-mail-info').hidden = false;
+      }
+      $('#warteliste').hidden = true;
+      const bannerBtn = $('#banner-waitlist');
+      if (bannerBtn) bannerBtn.hidden = true;
+      const box = $('#wl-success');
+      box.hidden = false;
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      box.focus({ preventScroll: true });
+    } catch (_) {
+      errEl.textContent = 'Keine Verbindung zum Server. Bitte versuche es erneut.';
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // Start erfolgreich: Hinweis entfernen
   document.getElementById('js-warning')?.remove();

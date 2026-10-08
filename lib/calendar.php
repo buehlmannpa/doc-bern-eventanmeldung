@@ -45,6 +45,10 @@ function build_ics(): string
     }
 
     $location = trim(cfg('event.location', '') . ', ' . cfg('event.address', ''), ' ,');
+    $locUrl   = trim((string) cfg('event.location_url', ''));
+    if ($locUrl !== '') {
+        $description .= "\n\n" . cfg('event.location') . ': ' . $locUrl;
+    }
     $host     = preg_replace('/[^a-z0-9.\-]/i', '', (string) (cfg('mail.from') ? substr(strrchr((string) cfg('mail.from'), '@'), 1) : ($_SERVER['HTTP_HOST'] ?? 'localhost')));
 
     $lines = [
@@ -78,6 +82,7 @@ function build_ics(): string
         'SUMMARY:' . ics_escape(cfg('club.short') . ': ' . cfg('event.title')),
         'DESCRIPTION:' . ics_escape(trim($description)),
         'LOCATION:' . ics_escape($location),
+        ...($locUrl !== '' ? ['URL:' . $locUrl] : []),
         'BEGIN:VALARM',
         'TRIGGER:-P1D',
         'ACTION:DISPLAY',
