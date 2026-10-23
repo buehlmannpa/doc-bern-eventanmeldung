@@ -12,7 +12,13 @@
   const fmtDate = (iso) => new Date(iso).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const relLabel = { main: 'Hauptperson', companion: 'Weitere Person', child: 'Kind' };
 
-  const groups = !!(f.companion || f.children); // mehrere Personen pro Anmeldung möglich
+  const groups = !!(f.companion || f.children);
+  // Menüs pro Personenart: [{ key, label, price }]
+  const menusFor = (type) => (cfg.menus && cfg.menus[type === 'child' ? 'child' : 'adult']) || [];
+  const menuOf = (p) => { const l = menusFor(p.type); return l.find((m) => m.key === p.menu) || l[0] || { key: p.menu, label: p.menu, price: 0 }; };
+  const menuValid = (p) => menusFor(p.type).some((m) => m.key === p.menu);
+  const menuLabel = (p) => menuOf(p).label;
+  const isDefaultMenu = (p) => menuOf(p).key === (menusFor(p.type)[0] || {}).key; // mehrere Personen pro Anmeldung möglich
   let data = null;
   const view = { search: '', filter: 'all' };
 
@@ -227,10 +233,12 @@
       cards.push(['Personen nach Art', barList([{ label: 'Erwachsene', value: adults }, { label: 'Kinder', value: kids }])]);
     }
     if (f.alt_menu) {
-      cards.push(['Menüwahl', barList([
-        { label: cfg.menu.standard, value: persons.filter((p) => p.menu !== 'alternative').length },
-        { label: cfg.menu.alternative, value: persons.filter((p) => p.menu === 'alternative').length },
-      ])]);
+      const menuBars = (type) => menusFor(type).map((m) => ({
+        label: m.label,
+        value: persons.filter((p) => (p.type === 'child' ? 'child' : 'adult') === type && menuOf(p).key === m.key).length,
+      }));
+      if (menusFor('adult').length > 1) cards.push([f.children ? 'Menüwahl Erwachsene' : 'Menüwahl', barList(menuBars('adult'))]);
+      if (f.children && menusFor('child').length > 1) cards.push(['Menüwahl Kinder', barList(menuBars('child'))]);
     }
     if (Object.keys(roles).length) {
       cards.push(['Personen nach Rolle', barList([
@@ -271,7 +279,7 @@
     if (view.filter === 'pending') return r.payState === 'pending';
     if (view.filter === 'overdue') return r.payState === 'overdue';
     if (view.filter === 'children') return r.persons.some((p) => p.type === 'child');
-    if (view.filter === 'alt') return r.persons.some((p) => p.menu === 'alternative');
+    if (view.filter.startsWith('menu:')) return r.persons.some((p) => p.type !== 'child' && menuOf(p).key === view.filter.slice(5));
     if (view.filter.startsWith('role:')) return r.persons.some((p) => p.role === view.filter.slice(5));
     return true;
   }
@@ -282,7 +290,7 @@
     const filters = [['all', 'Alle']];
     Object.entries(roles).forEach(([k, r]) => filters.push([`role:${k}`, r.label]));
     if (f.children) filters.push(['children', 'Mit Kindern']);
-    if (f.alt_menu) filters.push(['alt', cfg.menu.alternative]);
+    if (f.alt_menu) menusFor('adult').slice(1).forEach((m) => filters.push([`menu:${m.key}`, m.label]));
     if (f.payment) {
       filters.push(['pending', 'Provisorisch']);
       filters.push(['overdue', 'Zahlung überfällig']);
@@ -347,7 +355,9 @@
       return [
         withRelation ? `<span class="tag">${relLabel[p.relation] || ''}</span>` : '',
         role ? `<span class="tag tag-role" style="--role:${esc(role.color)}">${esc(role.label)}</span>` : '',
-        f.alt_menu ? `<span class="tag ${p.menu === 'alternative' ? 'tag-alt' : ''}">${esc(cfg.menu[p.menu] || p.menu)}</span>` : '',
+        f.alt_menu ? (menuValid(p)
+          ? `<span class="tag ${isDefaultMenu(p) ? '' : 'tag-alt'}">${esc(menuLabel(p))}</span>`
+          : `<span class="tag tag-warn" title="Gespeichertes Menü passt nicht mehr zur Konfiguration. Bitte bearbeiten und Menü wählen.">Menü nicht gewählt</span>`) : '',
       ].join('');
     };
     const personRow = (p) => {
@@ -400,7 +410,7 @@
   function priceFor(p) {
     if (!f.payment) return 0;
     if (p.role && roles[p.role]?.free) return 0;
-    return p.type === 'child' ? cfg.prices.child : cfg.prices.adult;
+    return Number(menuOf(p).price) || 0;
   }
 
   async function deleteReg(id) {
@@ -492,7 +502,7 @@
     };
 
     const roleOptions = (sel) => `<option value="">Keine Rolle</option>${Object.entries(roles).map(([k, r]) => `<option value="${esc(k)}" ${sel === k ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}`;
-    const personFields = (key, p, title, removable) => `
+    const personFields = (key, p, title, removable, type = 'adult') => `
       <fieldset class="person-block" data-key="${key}">
         <legend>${title}</legend>
         ${removable ? `<button type="button" class="icon-btn remove" data-remove="${key}" aria-label="${title} entfernen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>` : ''}
@@ -503,9 +513,8 @@
         </div>
         ${Object.keys(roles).length || f.alt_menu ? `<div class="grid-2">
           ${Object.keys(roles).length ? `<label class="field"><span>Rolle</span><select name="${key}.role">${roleOptions(p.role)}</select></label>` : ''}
-          ${f.alt_menu ? `<label class="field"><span>Menü</span><select name="${key}.menu">
-            <option value="standard" ${p.menu !== 'alternative' ? 'selected' : ''}>${esc(cfg.menu.standard)}</option>
-            <option value="alternative" ${p.menu === 'alternative' ? 'selected' : ''}>${esc(cfg.menu.alternative)}</option></select></label>` : ''}
+          ${f.alt_menu ? `<label class="field"><span>${type === 'child' ? 'Kindermenü' : 'Menü'}</span><select name="${key}.menu">
+            ${menusFor(type).map((m) => `<option value="${esc(m.key)}" ${menuOf({ type, menu: p.menu }).key === m.key ? 'selected' : ''}>${esc(m.label)}${f.payment ? ` (${chf(m.price)})` : ''}</option>`).join('')}</select></label>` : ''}
         </div>` : ''}
       </fieldset>`;
 
@@ -534,7 +543,7 @@
             ${personFields('main', model.main, groups ? 'Hauptperson' : 'Person', false)}
             <label class="field"><span>E-Mail</span><input type="email" name="email" value="${esc(model.email)}" maxlength="120"></label>
             ${model.companion ? personFields('companion', model.companion, 'Weitere Person', true) : ''}
-            ${model.children.map((c, i) => personFields(`child${i}`, c, `Kind ${i + 1}`, true)).join('')}
+            ${model.children.map((c, i) => personFields(`child${i}`, c, `Kind ${i + 1}`, true, 'child')).join('')}
             ${groups ? `<div class="add-row">
               ${f.companion && !model.companion ? '<button type="button" class="btn btn-glass" data-add="companion">+ Weitere Person</button>' : ''}
               ${f.children ? '<button type="button" class="btn btn-glass" data-add="child">+ Kind</button>' : ''}

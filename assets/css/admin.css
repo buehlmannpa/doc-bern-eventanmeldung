@@ -159,6 +159,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .p-price { font-variant-numeric: tabular-nums; color: var(--text-2); min-width: 9ch; text-align: right; }
 .tag-role { background: var(--role); color: #fff; border-color: transparent; font-weight: 650; text-shadow: 0 1px 1px rgba(0, 0, 0, .25); }
 .tag-alt { border-color: var(--notice-border); background: var(--notice-bg); color: var(--notice-text); }
+.tag-warn { border-color: var(--error-border); background: var(--error-bg); color: var(--error-text); font-weight: 650; }
 
 .reg-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; color: var(--text-2); font-size: .92rem; }
 .reg-foot:empty { display: none; }
