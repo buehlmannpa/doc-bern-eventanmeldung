@@ -66,32 +66,44 @@ return [
         ['time' => '19:30 bis 24:00', 'title' => 'DOC Weihnachtsessen',          'text' => 'Apéro, Essen und gemütliches Beisammensein'],
     ],
 
-    // Menü (nur relevant, wenn 'alt_menu' aktiv ist oder ein Menü angezeigt werden soll)
-    'menu' => [
-        'standard' => [
-            'label'   => 'Weihnachtsmenü',
-            'courses' => [                              // TODO: Menü eintragen
-                'Vorspeise folgt',
-                'Hauptgang folgt',
-                'Dessert folgt',
+    // Menüs (Auswahl pro Person nur, wenn 'alt_menu' aktiv ist)
+    // Pro Menü: Bezeichnung, Preis und optional die Gänge (werden auf der Seite angezeigt).
+    // Die Schlüssel (z.B. 'standard', 'burger') nach dem Start der Anmeldung nicht mehr ändern,
+    // sonst passen bestehende Anmeldungen nicht mehr zum Menü.
+    'menus' => [
+        'adult' => [
+            'standard' => [
+                'label'   => 'Weihnachtsmenü',
+                'price'   => 52,
+                'courses' => [                          // TODO: Menü eintragen
+                    'Vorspeise folgt',
+                    'Hauptgang folgt',
+                    'Dessert folgt',
+                ],
+            ],
+            'alternative' => [
+                'label'   => 'Vegetarisches Menü',
+                'price'   => 49,
+                'courses' => [                          // TODO: Vegi Menü eintragen
+                    'Vorspeise folgt',
+                    'Hauptgang folgt',
+                    'Dessert folgt',
+                ],
             ],
         ],
-        'alternative' => [
-            'label'   => 'Vegetarisches Menü',
-            'hint'    => 'Bitte bei der Anmeldung pro Person auswählen.',
-            'courses' => [                              // TODO: Alternativmenü eintragen
-                'Vorspeise folgt',
-                'Hauptgang folgt',
-                'Dessert folgt',
-            ],
+        'child' => [
+            'burger'  => ['label' => 'Burger und Pommes',          'price' => 16],
+            'nuggets' => ['label' => 'Chicken Nuggets und Pommes', 'price' => 16],
+            'pasta'   => ['label' => 'Teigwaren mit Tomatensauce', 'price' => 11],
         ],
     ],
 
     // Preise (nur relevant, wenn 'payment' aktiv ist)
+    // Preise stehen pro Menü (siehe 'menus'). Diese Werte gelten nur, wenn bei einem Menü kein Preis steht.
     'prices' => [
         'currency' => 'CHF',
-        'adult'    => 51,
-        'child'    => 25,
+        'adult'    => 52,
+        'child'    => 16,
     ],
 
     'twint' => [

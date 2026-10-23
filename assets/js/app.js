@@ -64,16 +64,31 @@ window.addEventListener('error', (ev) => {
   // Bausteine
   // ---------------------------------------------------------------------
 
-  function menuChoice(key) {
-    if (!f.alt_menu) return '';
+  // Menüs pro Personenart: [{ key, label, price }]
+  const menusFor = (type) => (cfg.menus && cfg.menus[type]) || [];
+  const menuPrice = (type, key) => {
+    const list = menusFor(type);
+    const m = list.find((x) => x.key === key) || list[0];
+    return m ? Number(m.price) : 0;
+  };
+
+  function menuChoice(key, type) {
+    const options = menusFor(type);
+    if (!f.alt_menu || options.length < 2) return '';
     return `
-      <div class="segmented" role="radiogroup" aria-label="Menüwahl">
-        <label><input type="radio" name="${key}.menu" value="standard" checked><span>${esc(cfg.menu.standard)}</span></label>
-        <label><input type="radio" name="${key}.menu" value="alternative"><span>${esc(cfg.menu.alternative)}</span></label>
+      <div class="menu-pick" role="radiogroup" aria-label="Menü wählen">
+        <span class="menu-pick-title">${type === 'child' ? 'Kindermenü' : 'Menü'}</span>
+        <div class="menu-pick-options">
+          ${options.map((m, i) => `
+            <label class="menu-opt">
+              <input type="radio" name="${key}.menu" value="${esc(m.key)}" ${i === 0 ? 'checked' : ''}>
+              <span><strong>${esc(m.label)}</strong>${f.payment ? `<small>${chf(m.price)}</small>` : ''}</span>
+            </label>`).join('')}
+        </div>
       </div>`;
   }
 
-  function personBlock(key, title, removeLabel) {
+  function personBlock(key, title, removeLabel, type = 'adult') {
     const el = document.createElement('fieldset');
     el.className = 'person-block appear';
     el.dataset.key = key;
@@ -86,12 +101,12 @@ window.addEventListener('error', (ev) => {
         <label class="field"><span>Vorname</span><input type="text" name="${key}.first" required maxlength="60" autocomplete="off"></label>
         <label class="field"><span>Nachname</span><input type="text" name="${key}.last" required maxlength="60" autocomplete="off"></label>
       </div>
-      ${menuChoice(key)}`;
+      ${menuChoice(key, type)}`;
     return el;
   }
 
   const mainMenu = $('[data-menu-for="main"]');
-  if (mainMenu) mainMenu.innerHTML = menuChoice('main');
+  if (mainMenu) mainMenu.innerHTML = menuChoice('main', 'adult');
 
   // Weitere Person (max. 1)
   const addCompanion = $('#add-companion');
@@ -114,7 +129,7 @@ window.addEventListener('error', (ev) => {
   const childrenWrap = $('#children-wrap');
   addChild?.addEventListener('click', () => {
     const key = `child${childSeq++}`;
-    const block = personBlock(key, 'Kind', 'Kind entfernen');
+    const block = personBlock(key, 'Kind', 'Kind entfernen', 'child');
     block.classList.add('child-block');
     block.querySelector('.remove').addEventListener('click', () => {
       block.remove();
@@ -138,7 +153,7 @@ window.addEventListener('error', (ev) => {
   // ---------------------------------------------------------------------
 
   const val = (name) => (form.elements[name]?.value || '').trim();
-  const menuVal = (key) => (form.querySelector(`input[name="${key}.menu"]:checked`)?.value || 'standard');
+  const menuVal = (key, type = 'adult') => (form.querySelector(`input[name="${key}.menu"]:checked`)?.value || menusFor(type)[0]?.key || '');
 
   function collect() {
     const data = {
@@ -153,7 +168,7 @@ window.addEventListener('error', (ev) => {
     }
     $$('.child-block').forEach((b) => {
       const k = b.dataset.key;
-      data.children.push({ first: val(`${k}.first`), last: val(`${k}.last`), menu: menuVal(k), _key: k });
+      data.children.push({ first: val(`${k}.first`), last: val(`${k}.last`), menu: menuVal(k, 'child'), _key: k });
     });
     return data;
   }
@@ -167,7 +182,12 @@ window.addEventListener('error', (ev) => {
 
     let html = `<span><strong>${total}</strong> ${total === 1 ? 'Person' : 'Personen'}</span>`;
     if (kids) html += `<span>${adults} Erw. und ${kids} ${kids === 1 ? 'Kind' : 'Kinder'}</span>`;
-    if (f.payment) html += `<span>Total <strong>${chf(adults * cfg.prices.adult + kids * cfg.prices.child)}</strong></span>`;
+    if (f.payment) {
+      const sum = menuPrice('adult', d.main.menu)
+        + (d.companion ? menuPrice('adult', d.companion.menu) : 0)
+        + d.children.reduce((a, c) => a + menuPrice('child', c.menu), 0);
+      html += `<span>Total <strong>${chf(sum)}</strong></span>`;
+    }
     $('#summary').innerHTML = html;
 
     const err = $('#capacity-error');
@@ -345,7 +365,7 @@ window.addEventListener('error', (ev) => {
     list.innerHTML = summary.persons.map((p) => `
       <li>
         <span>${esc(p.name)}${p.type === 'child' ? ' <em>(Kind)</em>' : ''}</span>
-        ${f.alt_menu ? `<span class="tag">${esc(cfg.menu[p.menu] || p.menu)}</span>` : ''}
+        ${f.alt_menu ? `<span class="tag">${esc(p.menuLabel || p.menu)}</span>` : ''}
         ${f.payment ? `<strong>${chf(p.price)}</strong>` : ''}
       </li>`).join('');
     const total = $('#success-total');

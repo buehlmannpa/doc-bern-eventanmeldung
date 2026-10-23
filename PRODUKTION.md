@@ -55,9 +55,9 @@ In `config/event.php` im Bereich `event`:
 
 Weitere Punkte:
 
-* **Menü:** unter `menu` die Gänge für `standard` und `alternative` eintragen (je eine Zeile pro Gang). Die Bezeichnungen (`label`) sind frei wählbar, z.B. «Vegetarisches Menü».
+* **Menüs und Preise:** im Block `menus` stehen die Menüs für Erwachsene (`adult`) und Kinder (`child`), jeweils mit Bezeichnung (`label`), Preis (`price`) und optional den Gängen (`courses`). Jede Person wählt bei der Anmeldung ihr Menü, der Betrag wird pro Menü berechnet. Die Schlüssel (z.B. `standard`, `burger`) nach dem Start der Anmeldung nicht mehr ändern.
 * **Ablauf:** unter `program` die Zeiten und Programmpunkte prüfen.
-* **Preise:** unter `prices` prüfen (aktuell Erwachsene 51, Kinder 25 CHF).
+* **Preise:** stehen pro Menü im Block `menus`. Die Werte unter `prices` gelten nur, wenn bei einem Menü kein Preis eingetragen ist.
 * **Limit:** `capacity` (aktuell 80 Personen). Kann im CMS jederzeit übersteuert werden.
 * **Anmeldeschluss und Zahlungsfrist:** `deadline`, z.B. `'2026-11-28 23:59'`. Danach schliesst die Anmeldung automatisch. Der gleiche Zeitpunkt gilt als Zahlungsfrist (siehe Abschnitt 6a).
 

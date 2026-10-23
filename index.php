@@ -38,9 +38,28 @@ header('Cache-Control: no-store');
 
 $f        = cfg('features');
 $program  = cfg('program', []);
-$menuStd  = cfg('menu.standard', []);
-$menuAlt  = cfg('menu.alternative', []);
-$hasMenu  = !empty($menuStd['courses']) || ($f['alt_menu'] && !empty($menuAlt['courses']));
+$menus    = menus();
+$adultMenus = array_filter($menus['adult'], fn ($m) => !empty($m['courses']));
+$kidMenus   = ($f['children'] && $f['alt_menu'] && has_child_menus()) ? $menus['child'] : [];
+$hasMenu  = $adultMenus || $kidMenus;
+$showMenuPrice = $f['payment'];
+
+// Preisliste: pro Personenart eine Zeile, oder eine Zeile pro Menü, wenn die Preise verschieden sind
+$priceRows = [];
+foreach (['adult' => 'Erwachsene', 'child' => 'Kinder'] as $type => $typeLabel) {
+    if ($type === 'child' && !$f['children']) {
+        continue;
+    }
+    $list   = $menus[$type];
+    $prices = array_unique(array_map(fn ($m) => $m['price'], $list));
+    if (count($prices) <= 1) {
+        $priceRows[] = [$typeLabel, '', (float) reset($prices)];
+    } else {
+        foreach ($list as $m) {
+            $priceRows[] = [$m['label'], $typeLabel, $m['price']];
+        }
+    }
+}
 $theme    = preg_replace('/[^a-z0-9\-]/i', '', (string) cfg('theme', ''));
 $timeText = cfg('event.start') . ' bis ' . cfg('event.end') . ' Uhr';
 $twintQr  = cfg('features.payment') ? twint_qr_path() : '';
@@ -170,17 +189,30 @@ $base     = e(base_path());
     <!-- Menü -->
     <section class="glass">
         <h2>Menü</h2>
-        <div class="menus <?= ($f['alt_menu'] && !empty($menuAlt['courses'])) ? 'menus-2' : '' ?>">
-            <?php foreach (['standard' => $menuStd, 'alternative' => $menuAlt] as $key => $menu): ?>
-                <?php if (empty($menu['courses']) || ($key === 'alternative' && !$f['alt_menu'])) continue; ?>
+        <div class="menus <?= (count($adultMenus) + ($kidMenus ? 1 : 0)) > 1 ? 'menus-2' : '' ?>">
+            <?php foreach ($adultMenus as $menu): ?>
                 <article class="menu-card">
-                    <h3><?= e($menu['label'] ?? '') ?></h3>
-                    <?php if (!empty($menu['hint'])): ?><p class="menu-hint"><?= e($menu['hint']) ?></p><?php endif; ?>
+                    <div class="menu-card-head">
+                        <h3><?= e($menu['label']) ?></h3>
+                        <?php if ($showMenuPrice): ?><span class="menu-price"><?= e(format_chf($menu['price'])) ?></span><?php endif; ?>
+                    </div>
+                    <?php if ($menu['hint'] !== ''): ?><p class="menu-hint"><?= e($menu['hint']) ?></p><?php endif; ?>
                     <ul>
                         <?php foreach ($menu['courses'] as $course): ?><li><?= e($course) ?></li><?php endforeach; ?>
                     </ul>
                 </article>
             <?php endforeach; ?>
+            <?php if ($kidMenus): ?>
+                <article class="menu-card menu-card-kids">
+                    <div class="menu-card-head"><h3>Kindermenüs</h3></div>
+                    <p class="menu-hint">Bitte bei der Anmeldung pro Kind auswählen.</p>
+                    <ul>
+                        <?php foreach ($kidMenus as $menu): ?>
+                            <li class="kid-menu"><span><?= e($menu['label']) ?></span><?php if ($showMenuPrice): ?><strong><?= e(format_chf($menu['price'])) ?></strong><?php endif; ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </article>
+            <?php endif; ?>
         </div>
     </section>
     <?php endif; ?>
@@ -192,10 +224,9 @@ $base     = e(base_path());
         <div class="payment">
             <div>
                 <ul class="prices">
-                    <li><span>Erwachsene</span><strong><?= e(format_chf((float) cfg('prices.adult'))) ?></strong></li>
-                    <?php if ($f['children']): ?>
-                        <li><span>Kinder</span><strong><?= e(format_chf((float) cfg('prices.child'))) ?></strong></li>
-                    <?php endif; ?>
+                    <?php foreach ($priceRows as [$label, $sub, $price]): ?>
+                        <li><span><?= e($label) ?><?php if ($sub !== ''): ?> <small><?= e($sub) ?></small><?php endif; ?></span><strong><?= e(format_chf($price)) ?></strong></li>
+                    <?php endforeach; ?>
                 </ul>
                 <p class="muted">Bezahlung bequem per TWINT: QR Code in der TWINT App scannen und den Betrag für alle angemeldeten Personen überweisen.</p>
                 <?php if (cfg('twint.note')): ?><p class="muted"><?= e(cfg('twint.note')) ?></p><?php endif; ?>
@@ -326,7 +357,7 @@ $base     = e(base_path());
             <p class="muted" id="mail-info" <?= !empty($post['mailSent']) ? '' : 'hidden' ?>><?php if (!empty($post['mailSent'])): ?>Eine Bestätigung wurde an <?= e($post['summary']['email']) ?> gesendet. Bitte prüfe allenfalls auch den Spamordner.<?php endif; ?></p>
             <p class="muted">Folgende Personen sind angemeldet:</p>
             <ul class="success-list" id="success-list"><?php if ($done): foreach ($post['summary']['persons'] as $p): ?>
-                <li><span><?= e($p['name']) ?><?= $p['type'] === 'child' ? ' <em>(Kind)</em>' : '' ?></span><?php if ($f['alt_menu']): ?><span class="tag"><?= e(cfg('menu.' . $p['menu'] . '.label', $p['menu'])) ?></span><?php endif; ?><?php if ($f['payment']): ?><strong><?= e(format_chf((float) $p['price'])) ?></strong><?php endif; ?></li>
+                <li><span><?= e($p['name']) ?><?= $p['type'] === 'child' ? ' <em>(Kind)</em>' : '' ?></span><?php if ($f['alt_menu']): ?><span class="tag"><?= e(menu_label($p['type'], $p['menu'])) ?></span><?php endif; ?><?php if ($f['payment']): ?><strong><?= e(format_chf((float) $p['price'])) ?></strong><?php endif; ?></li>
             <?php endforeach; endif; ?></ul>
             <?php if ($f['payment']): ?>
                 <div class="success-pay">

@@ -101,6 +101,7 @@ function register_attempt(array $in): array
                 'name'  => $p['first'] . ' ' . $p['last'],
                 'type'  => $p['type'],
                 'menu'  => $p['menu'],
+                'menuLabel' => menu_label($p['type'], $p['menu']),
                 'price' => price_for($p),
             ], $reg['persons']),
             'total'   => registration_total($reg),

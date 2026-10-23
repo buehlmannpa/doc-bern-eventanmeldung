@@ -372,6 +372,115 @@ function twint_qr_path(bool $allowPlaceholder = true): string
     return $allowPlaceholder ? 'assets/img/twint-qr.svg' : '';
 }
 
+// ----------------------------------------------------------------------
+// Menüs und Preise
+// ----------------------------------------------------------------------
+
+/**
+ * Alle Menüs pro Personenart, z.B.
+ *   ['adult' => ['standard' => ['label' => 'Weihnachtsmenü', 'price' => 52.0, 'courses' => [...], 'hint' => ''], ...],
+ *    'child' => ['burger' => [...], ...]]
+ *
+ * Neue Konfiguration: Block 'menus' (Erwachsene und Kinder getrennt, Preis pro Menü).
+ * Ältere Konfiguration ('menu' mit standard/alternative und Pauschalpreisen) wird weiterhin unterstützt.
+ * Ohne eigene Kindermenüs wählen Kinder aus den Erwachsenenmenüs zum Kinderpreis.
+ */
+function menus(): array
+{
+    static $menus = null;
+    if ($menus !== null) {
+        return $menus;
+    }
+    $norm = function ($list, string $type): array {
+        $out = [];
+        foreach (is_array($list) ? $list : [] as $key => $m) {
+            if (!is_array($m) || !preg_match('/^[a-z0-9_\-]{1,30}$/i', (string) $key)) {
+                continue;
+            }
+            $out[(string) $key] = [
+                'label'   => (string) ($m['label'] ?? $key),
+                'price'   => isset($m['price']) && $m['price'] !== '' ? (float) $m['price'] : (float) cfg("prices.$type", 0),
+                'courses' => array_values(array_filter((array) ($m['courses'] ?? []), 'is_string')),
+                'hint'    => (string) ($m['hint'] ?? ''),
+            ];
+        }
+        return $out;
+    };
+
+    $cfgMenus = cfg('menus');
+    if (is_array($cfgMenus)) {
+        $adult = $norm($cfgMenus['adult'] ?? [], 'adult');
+        $child = $norm($cfgMenus['child'] ?? [], 'child');
+    } else {
+        // Ältere Konfiguration
+        $legacy = ['standard' => cfg('menu.standard', []) + ['label' => 'Menü']];
+        if (cfg('features.alt_menu')) {
+            $legacy['alternative'] = cfg('menu.alternative', []) + ['label' => 'Alternatives Menü'];
+        }
+        foreach ($legacy as &$m) {
+            unset($m['price']);
+        }
+        unset($m);
+        $adult = $norm($legacy, 'adult');
+        $child = [];
+    }
+    if (!$adult) {
+        $adult = $norm(['standard' => ['label' => 'Menü']], 'adult');
+    }
+    if (!$child) {
+        // Kinder wählen aus den Erwachsenenmenüs, zum Kinderpreis
+        foreach ($adult as $key => $m) {
+            $child[$key] = ['price' => (float) cfg('prices.child', 0)] + $m;
+        }
+    }
+    // Ohne Menüwahl gibt es pro Personenart nur das erste Menü
+    if (!cfg('features.alt_menu')) {
+        $adult = array_slice($adult, 0, 1, true);
+        $child = array_slice($child, 0, 1, true);
+    }
+    return $menus = ['adult' => $adult, 'child' => $child];
+}
+
+/** Eigene Kindermenüs konfiguriert (nicht nur die Erwachsenenmenüs zum Kinderpreis)? */
+function has_child_menus(): bool
+{
+    $m = cfg('menus');
+    return is_array($m) && !empty($m['child']);
+}
+
+function menu_type(string $type): string
+{
+    return $type === 'child' ? 'child' : 'adult';
+}
+
+/** Gültiger Menüschlüssel für die Personenart (sonst das erste Menü). */
+function menu_key(string $type, $key): string
+{
+    $list = menus()[menu_type($type)];
+    return (is_string($key) && isset($list[$key])) ? $key : (string) array_key_first($list);
+}
+
+/** Ist der gespeicherte Menüschlüssel für diese Personenart gültig? (Alte Anmeldungen evtl. nicht) */
+function menu_valid(string $type, $key): bool
+{
+    return is_string($key) && isset(menus()[menu_type($type)][$key]);
+}
+
+/**
+ * Bezeichnung des Menüs. Bei einem ungültigen Schlüssel (z.B. Anmeldung aus einer älteren Konfiguration)
+ * das Menü, das auch für den Preis verwendet wird: das erste Menü dieser Personenart.
+ */
+function menu_label(string $type, $key): string
+{
+    return (string) (menus()[menu_type($type)][menu_key($type, $key)]['label'] ?? $key);
+}
+
+function menu_price(string $type, $key): float
+{
+    $list = menus()[menu_type($type)];
+    return (float) ($list[menu_key($type, $key)]['price'] ?? cfg('prices.' . menu_type($type), 0));
+}
+
 function price_for(array $person): float
 {
     if (!cfg('features.payment')) {
@@ -381,7 +490,7 @@ function price_for(array $person): float
     if ($role !== '' && cfg("roles.$role.free")) {
         return 0.0;
     }
-    return (float) (($person['type'] ?? 'adult') === 'child' ? cfg('prices.child', 0) : cfg('prices.adult', 0));
+    return menu_price((string) ($person['type'] ?? 'adult'), $person['menu'] ?? '');
 }
 
 function registration_total(array $reg): float
@@ -409,10 +518,9 @@ function clean_text($value, int $max = 80): string
 function normalize_registration(array $in, bool $admin = false): array
 {
     $errors  = [];
-    $altMenu = (bool) cfg('features.alt_menu');
     $roles   = array_keys(cfg('roles', []));
 
-    $person = function (array $p, string $relation, string $type, string $prefix) use (&$errors, $altMenu, $admin, $roles): array {
+    $person = function (array $p, string $relation, string $type, string $prefix) use (&$errors, $admin, $roles): array {
         $first = clean_text($p['first'] ?? '', 60);
         $last  = clean_text($p['last'] ?? '', 60);
         if ($first === '') {
@@ -421,7 +529,7 @@ function normalize_registration(array $in, bool $admin = false): array
         if ($last === '') {
             $errors[$prefix . '.last'] = 'Bitte Nachname angeben.';
         }
-        $menu = ($altMenu && ($p['menu'] ?? '') === 'alternative') ? 'alternative' : 'standard';
+        $menu = menu_key($type, $p['menu'] ?? '');
         $role = ($admin && in_array($p['role'] ?? '', $roles, true)) ? $p['role'] : '';
         return [
             'id'       => preg_match('/^[a-f0-9]{8,32}$/', (string) ($p['id'] ?? '')) ? $p['id'] : random_id(6),
@@ -508,9 +616,18 @@ function public_config(): array
     return [
         'features' => cfg('features'),
         'prices'   => cfg('prices'),
-        'menu'     => [
-            'standard'    => cfg('menu.standard.label', 'Menü'),
-            'alternative' => cfg('menu.alternative.label', 'Alternatives Menü'),
-        ],
+        'menus'    => menus_public(),
     ];
+}
+
+/** Menüs für JavaScript: Personenart => Liste von {key, label, price}. */
+function menus_public(): array
+{
+    $out = [];
+    foreach (menus() as $type => $list) {
+        foreach ($list as $key => $m) {
+            $out[$type][] = ['key' => $key, 'label' => $m['label'], 'price' => $m['price']];
+        }
+    }
+    return $out;
 }

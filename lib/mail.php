@@ -239,7 +239,7 @@ function confirmation_content(array $reg): array
     $contact = (string) cfg('club.contact_email', '');
     $total   = registration_total($reg);
     $notice  = cfg('notice_after_registration', []);
-    $menuLbl = fn ($m) => (string) cfg("menu.$m.label", $m);
+    $menuLbl = fn (array $p) => menu_label($p['type'], $p['menu']);
 
     // --- Text ---------------------------------------------------------------
     $t   = [];
@@ -250,7 +250,7 @@ function confirmation_content(array $reg): array
     foreach ($persons as $p) {
         $line = '* ' . $p['first'] . ' ' . $p['last'] . ($p['type'] === 'child' ? ' (Kind)' : '');
         if ($f['alt_menu']) {
-            $line .= ', ' . $menuLbl($p['menu']);
+            $line .= ', ' . $menuLbl($p);
         }
         if ($f['payment']) {
             $line .= ', ' . format_chf(price_for($p));
@@ -308,7 +308,7 @@ function confirmation_content(array $reg): array
     foreach ($persons as $p) {
         $rows .= '<tr><td style="padding:8px 0;border-bottom:1px solid #eee;">' . e($p['first'] . ' ' . $p['last'])
             . ($p['type'] === 'child' ? ' <span style="color:#888;">(Kind)</span>' : '') . '</td>'
-            . ($f['alt_menu'] ? '<td style="padding:8px 0 8px 12px;border-bottom:1px solid #eee;color:#555;">' . e($menuLbl($p['menu'])) . '</td>' : '')
+            . ($f['alt_menu'] ? '<td style="padding:8px 0 8px 12px;border-bottom:1px solid #eee;color:#555;">' . e($menuLbl($p)) . '</td>' : '')
             . ($f['payment'] ? '<td style="padding:8px 0 8px 12px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;">' . e(format_chf(price_for($p))) . '</td>' : '')
             . '</tr>';
     }

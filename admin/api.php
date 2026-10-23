@@ -79,7 +79,7 @@ try {
         $status  = registration_status($list, $store->state());
         $payName = ['definitive' => 'Definitiv', 'pending' => 'Provisorisch', 'overdue' => 'Zahlung überfällig'];
         $relName = ['main' => 'Hauptperson', 'companion' => 'Weitere Person', 'child' => 'Kind'];
-        $menu    = fn ($m) => (string) cfg("menu.$m.label", $m);
+        $menuCount = [];
         $date    = fn ($iso) => $iso ? date('d.m.Y H:i', strtotime($iso)) : '';
 
         // Tabelle Personen
@@ -114,12 +114,13 @@ try {
             foreach ($r['persons'] as $p) {
                 $row = [$nr, $date($r['created_at']), $p['first'], $p['last'], $p['relation'] === 'main' ? $r['email'] : '',
                         $relName[$p['relation']] ?? '', $roles[$p['role']]['label'] ?? ''];
-                if ($f['alt_menu']) { $row[] = $menu($p['menu']); }
+                if ($f['alt_menu']) { $row[] = menu_label($p['type'], $p['menu']) . (menu_valid($p['type'], $p['menu']) ? '' : ' (nicht gewählt)'); }
                 if ($f['payment'])  { $row[] = ['money' => price_for($p)]; $row[] = $paid ? 'ja' : 'nein'; }
                 $row[] = $p['relation'] === 'main' ? ($r['notes'] ?? '') : '';
                 $pRows[]   = $row;
                 $pStyles[] = $p['role'] !== '' && isset($roles[$p['role']]) ? $p['role'] : null;
-                if ($p['menu'] === 'alternative') { $sum['alt']++; }
+                $mk = menu_type($p['type']) . ':' . menu_key($p['type'], $p['menu']);
+                $menuCount[$mk] = ($menuCount[$mk] ?? 0) + 1;
                 if (isset($roleCount[$p['role']])) { $roleCount[$p['role']]++; }
             }
 
@@ -146,8 +147,18 @@ try {
             ['Kinder', $sum['children']],
         ];
         if ($f['alt_menu']) {
-            $ov[] = [$menu('standard'), $status['taken'] - $sum['alt']];
-            $ov[] = [$menu('alternative'), $sum['alt']];
+            // Anzahl pro Menü (z.B. für die Bestellung beim Restaurant)
+            $ov[] = [];
+            $ov[] = [['title' => 'Menüs']];
+            foreach (menus() as $type => $menuList) {
+                if ($type === 'child' && !$f['children']) {
+                    continue;
+                }
+                foreach ($menuList as $key => $m) {
+                    $ov[] = [($type === 'child' ? 'Kinder: ' : ($f['children'] ? 'Erwachsene: ' : '')) . $m['label'], $menuCount["$type:$key"] ?? 0];
+                }
+            }
+            $ov[] = [];
         }
         foreach ($roles as $k => $role) {
             $ov[] = [$role['label'] . ($role['free'] ? ' (kostenlos)' : ''), $roleCount[$k]];
@@ -230,7 +241,7 @@ try {
                     $p['relation'] === 'main' ? $r['email'] : '',
                     ['main' => 'Hauptperson', 'companion' => 'Weitere Person', 'child' => 'Kind'][$p['relation']] ?? '',
                     $roles[$p['role']]['label'] ?? '',
-                    cfg('menu.' . $p['menu'] . '.label', $p['menu']),
+                    menu_label($p['type'], $p['menu']),
                     number_format(price_for($p), 2, '.', ''),
                     !empty($r['paid']) ? 'ja' : 'nein',
                     $p['relation'] === 'main' ? ($r['notes'] ?? '') : '',

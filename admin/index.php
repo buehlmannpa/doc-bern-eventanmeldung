@@ -138,10 +138,7 @@ $base  = e(base_path());
     'features' => cfg('features'),
     'prices'   => cfg('prices'),
     'roles'    => cfg('roles', []),
-    'menu'     => [
-        'standard'    => cfg('menu.standard.label', 'Menü'),
-        'alternative' => cfg('menu.alternative.label', 'Alternatives Menü'),
-    ],
+    'menus'    => menus_public(),
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <script src="<?= $asset('assets/js/admin.js') ?>"></script>
 
