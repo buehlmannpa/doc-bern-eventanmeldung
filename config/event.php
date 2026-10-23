@@ -66,10 +66,15 @@ return [
         ['time' => 'ab 19:30',        'title' => 'DOC Weihnachtsessen', 'text' => 'Separate Anmeldung erforderlich'],
     ],
 
-    // Menü (nur relevant, wenn 'alt_menu' aktiv ist oder ein Menü angezeigt werden soll)
-    'menu' => [
-        'standard'    => ['label' => 'Menü',              'courses' => []],
-        'alternative' => ['label' => 'Alternatives Menü', 'courses' => []],
+    // Menüs (Auswahl pro Person nur, wenn 'alt_menu' aktiv ist)
+    // Pro Menü: Bezeichnung, optional Preis und Gänge. Ohne Preis gilt der Wert aus 'prices'.
+    // Ohne eigene Kindermenüs ('child' leer) wählen Kinder aus den Erwachsenenmenüs zum Kinderpreis.
+    'menus' => [
+        'adult' => [
+            'standard'    => ['label' => 'Menü',              'courses' => []],
+            'alternative' => ['label' => 'Alternatives Menü', 'courses' => []],
+        ],
+        'child' => [],
     ],
 
     // Preise (nur relevant, wenn 'payment' aktiv ist)
