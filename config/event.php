@@ -48,6 +48,7 @@ return [
     // ------------------------------------------------------------------
     'features' => [
         'companion'    => false,  // an der GV nur Mitglieder
+        'max_companions' => 5,    // nur relevant, wenn 'companion' aktiv ist
         'children'     => false,
         'max_children' => 0,
         'alt_menu'     => false,

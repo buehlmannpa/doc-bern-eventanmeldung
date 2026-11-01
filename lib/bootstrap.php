@@ -11,8 +11,9 @@ $GLOBALS['config'] = require APP_ROOT . '/config/event.php';
 // Fehlende Schalter (z.B. aus einer älteren config/event.php) mit sicheren Standardwerten ergänzen,
 // damit nie eine PHP Warnung in die Seite geschrieben wird.
 $GLOBALS['config']['features'] = array_merge([
-    'companion'    => false,
-    'children'     => false,
+    'companion'      => false,
+    'max_companions' => 5,
+    'children'       => false,
     'max_children' => 8,
     'alt_menu'     => false,
     'payment'      => false,
@@ -331,6 +332,18 @@ function registration_status(array $registrations, array $state, ?array $waitlis
     ];
 }
 
+/** Maximale Anzahl weiterer erwachsener Personen pro Anmeldung (0, wenn ausgeschaltet). */
+function max_companions(): int
+{
+    return cfg('features.companion') ? max(1, (int) cfg('features.max_companions', 5)) : 0;
+}
+
+/** Maximale Anzahl Personen pro Anmeldung (Hauptperson, weitere Personen und Kinder). */
+function max_persons_per_registration(): int
+{
+    return 1 + max_companions() + (cfg('features.children') ? (int) cfg('features.max_children', 8) : 0);
+}
+
 /** Anmeldeschluss als Text, z.B. "Samstag, 28. November 2026, 23:59 Uhr" (leer, wenn keiner gesetzt). */
 function deadline_text(): string
 {
@@ -552,11 +565,21 @@ function normalize_registration(array $in, bool $admin = false): array
         $errors['email'] = 'Diese E-Mail Adresse ist ungültig.';
     }
 
-    if (!empty($in['companion']) && is_array($in['companion'])) {
+    // Weitere erwachsene Personen: 'companions' (Liste) oder älteres Format 'companion' (eine Person)
+    $companions = is_array($in['companions'] ?? null) ? array_values(array_filter($in['companions'], 'is_array')) : [];
+    if (!$companions && !empty($in['companion']) && is_array($in['companion'])) {
+        $companions = [$in['companion']];
+    }
+    if ($companions) {
+        $maxComp = max_companions();
         if (!cfg('features.companion')) {
-            $errors['companion'] = 'Begleitpersonen sind für diesen Anlass nicht möglich.';
+            $errors['companions'] = 'Weitere Personen sind für diesen Anlass nicht möglich.';
+        } elseif (count($companions) > $maxComp) {
+            $errors['companions'] = 'Es können maximal ' . $maxComp . ' weitere ' . ($maxComp === 1 ? 'Person' : 'Personen') . ' angemeldet werden.';
         } else {
-            $persons[] = $person($in['companion'], 'companion', 'adult', 'companion');
+            foreach ($companions as $i => $c) {
+                $persons[] = $person($c, 'companion', 'adult', 'companions.' . $i);
+            }
         }
     }
 
@@ -614,7 +637,7 @@ function format_chf(float $amount): string
 function public_config(): array
 {
     return [
-        'features' => cfg('features'),
+        'features' => cfg('features') + ['max_companions_effective' => max_companions()],
         'prices'   => cfg('prices'),
         'menus'    => menus_public(),
     ];
