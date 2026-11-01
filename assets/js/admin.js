@@ -13,6 +13,7 @@
   const relLabel = { main: 'Hauptperson', companion: 'Weitere Person', child: 'Kind' };
 
   const groups = !!(f.companion || f.children);
+  const maxCompanions = Number(f.max_companions_effective ?? f.max_companions ?? 5);
   // Menüs pro Personenart: [{ key, label, price }]
   const menusFor = (type) => (cfg.menus && cfg.menus[type === 'child' ? 'child' : 'adult']) || [];
   const menuOf = (p) => { const l = menusFor(p.type); return l.find((m) => m.key === p.menu) || l[0] || { key: p.menu, label: p.menu, price: 0 }; };
@@ -497,7 +498,7 @@
       notes: reg?.notes || '',
       sendMail: !reg,
       main: reg?.persons.find((p) => p.relation === 'main') || { first: fromWaitlist?.first || '', last: fromWaitlist?.last || '', menu: 'standard', role: '' },
-      companion: reg?.persons.find((p) => p.relation === 'companion') || null,
+      companions: reg?.persons.filter((p) => p.relation === 'companion') || [],
       children: reg?.persons.filter((p) => p.relation === 'child') || [],
     };
 
@@ -527,7 +528,7 @@
       model.paid = !!form.elements.paid?.checked;
       model.sendMail = !!form.elements.sendMail?.checked;
       model.main = person('main');
-      if (model.companion) model.companion = person('companion');
+      model.companions = model.companions.map((_, i) => person(`companion${i}`));
       model.children = model.children.map((_, i) => person(`child${i}`));
     };
 
@@ -539,13 +540,13 @@
             <button type="button" class="icon-btn" data-close aria-label="Schliessen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
           </header>
           <div class="dlg-body">
-            ${fromWaitlist ? `<div class="alert alert-notice">Aus der Warteliste: ${esc(fromWaitlist.first)} ${esc(fromWaitlist.last)} hat sich für <strong>${fromWaitlist.persons} ${fromWaitlist.persons === 1 ? 'Person' : 'Personen'}</strong> eingetragen. Weitere Person und Kinder bitte unten ergänzen.</div>` : ''}
+            ${fromWaitlist ? `<div class="alert alert-notice">Aus der Warteliste: ${esc(fromWaitlist.first)} ${esc(fromWaitlist.last)} hat sich für <strong>${fromWaitlist.persons} ${fromWaitlist.persons === 1 ? 'Person' : 'Personen'}</strong> eingetragen. Weitere Personen und Kinder bitte unten ergänzen.</div>` : ''}
             ${personFields('main', model.main, groups ? 'Hauptperson' : 'Person', false)}
             <label class="field"><span>E-Mail</span><input type="email" name="email" value="${esc(model.email)}" maxlength="120"></label>
-            ${model.companion ? personFields('companion', model.companion, 'Weitere Person', true) : ''}
+            ${model.companions.map((c, i) => personFields(`companion${i}`, c, `Weitere Person ${i + 1}`, true)).join('')}
             ${model.children.map((c, i) => personFields(`child${i}`, c, `Kind ${i + 1}`, true, 'child')).join('')}
             ${groups ? `<div class="add-row">
-              ${f.companion && !model.companion ? '<button type="button" class="btn btn-glass" data-add="companion">+ Weitere Person</button>' : ''}
+              ${f.companion && model.companions.length < maxCompanions ? '<button type="button" class="btn btn-glass" data-add="companion">+ Weitere Person</button>' : ''}
               ${f.children ? '<button type="button" class="btn btn-glass" data-add="child">+ Kind</button>' : ''}
             </div>` : ''}
             ${f.payment ? `<label class="switch"><input type="checkbox" name="paid" ${model.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : ''}
@@ -562,14 +563,14 @@
       $$('[data-close]', dlg).forEach((b) => b.addEventListener('click', () => dlg.close()));
       $$('[data-add]', dlg).forEach((b) => b.addEventListener('click', () => {
         readForm();
-        if (b.dataset.add === 'companion') model.companion = { first: '', last: '', menu: 'standard', role: '' };
+        if (b.dataset.add === 'companion') model.companions.push({ first: '', last: '', menu: 'standard', role: '' });
         else model.children.push({ first: '', last: '', menu: 'standard', role: '' });
         draw();
       }));
       $$('[data-remove]', dlg).forEach((b) => b.addEventListener('click', () => {
         readForm();
         const k = b.dataset.remove;
-        if (k === 'companion') model.companion = null;
+        if (k.startsWith('companion')) model.companions.splice(Number(k.replace('companion', '')), 1);
         else model.children.splice(Number(k.replace('child', '')), 1);
         draw();
       }));
@@ -581,7 +582,7 @@
       const errEl = $('[data-error]', dlg);
       const payload = {
         id: model.id, email: model.email, paid: model.paid, notes: model.notes,
-        main: model.main, companion: model.companion, children: model.children,
+        main: model.main, companions: model.companions, children: model.children,
       };
       const out = await api('save', { registration: payload, force, sendMail: model.sendMail && !!model.email, waitlistId: model.waitlistId });
       if (out.ok) {
@@ -596,7 +597,7 @@
       }
       $$('.field.invalid', dlg).forEach((x) => x.classList.remove('invalid'));
       Object.keys(out.fields || {}).forEach((k) => {
-        const name = k.replace(/^children\.(\d+)\./, 'child$1.');
+        const name = k.replace(/^children\.(\d+)\./, 'child$1.').replace(/^companions\.(\d+)\./, 'companion$1.');
         $(`[name="${name}"]`, dlg)?.closest('.field')?.classList.add('invalid');
       });
       errEl.textContent = out.error || 'Speichern fehlgeschlagen.';

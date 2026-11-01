@@ -47,7 +47,8 @@ return [
     // Funktionen
     // ------------------------------------------------------------------
     'features' => [
-        'companion'    => true,
+        'companion'    => true,   // weitere erwachsene Personen (ohne E-Mail)
+        'max_companions' => 5,    // maximale Anzahl weiterer Erwachsener pro Anmeldung
         'children'     => true,
         'max_children' => 8,
         'alt_menu'     => true,

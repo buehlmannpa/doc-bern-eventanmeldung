@@ -59,6 +59,7 @@ Weitere Punkte:
 * **Ablauf:** unter `program` die Zeiten und Programmpunkte prüfen.
 * **Preise:** stehen pro Menü im Block `menus`. Die Werte unter `prices` gelten nur, wenn bei einem Menü kein Preis eingetragen ist.
 * **Limit:** `capacity` (aktuell 80 Personen). Kann im CMS jederzeit übersteuert werden.
+* **Weitere erwachsene Personen:** unter `features` legt `max_companions` fest, wie viele weitere Erwachsene pro Anmeldung erfasst werden können (Standard 5, gilt auch ohne Eintrag).
 * **Anmeldeschluss und Zahlungsfrist:** `deadline`, z.B. `'2026-11-28 23:59'`. Danach schliesst die Anmeldung automatisch. Der gleiche Zeitpunkt gilt als Zahlungsfrist (siehe Abschnitt 6a).
 
 ## 5. Verweis auf die andere Anmeldung

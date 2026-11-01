@@ -135,7 +135,7 @@ $base  = e(base_path());
 <script type="application/json" id="admin-config"><?= json_encode([
     'csrf'     => csrf_token(),
     'api'      => base_path() . 'admin/api.php',
-    'features' => cfg('features'),
+    'features' => cfg('features') + ['max_companions_effective' => max_companions()],
     'prices'   => cfg('prices'),
     'roles'    => cfg('roles', []),
     'menus'    => menus_public(),

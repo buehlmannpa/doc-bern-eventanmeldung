@@ -285,7 +285,7 @@ $base     = e(base_path());
             <div class="add-row">
                 <?php if ($f['companion']): ?>
                     <button type="button" class="btn btn-glass" id="add-companion">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Weitere Person
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Person hinzufügen
                     </button>
                 <?php endif; ?>
                 <?php if ($f['children']): ?>
@@ -328,7 +328,7 @@ $base     = e(base_path());
                 <div class="grid-2">
                     <label class="field"><span>E-Mail</span><input type="email" name="wl_email" autocomplete="email" inputmode="email" required maxlength="120" value="<?= e($old['wl_email'] ?? '') ?>"></label>
                     <?php if ($f['companion'] || $f['children']): ?>
-                    <label class="field"><span>Anzahl Personen (inkl. Kinder)</span><input type="number" name="wl_persons" min="1" max="<?= 1 + ($f['companion'] ? 1 : 0) + (int) ($f['max_children'] ?? 8) ?>" value="<?= e($old['wl_persons'] ?? '1') ?>" inputmode="numeric"></label>
+                    <label class="field"><span>Anzahl Personen (inkl. Kinder)</span><input type="number" name="wl_persons" min="1" max="<?= max_persons_per_registration() ?>" value="<?= e($old['wl_persons'] ?? '1') ?>" inputmode="numeric"></label>
                     <?php endif; ?>
                 </div>
                 <label class="check">

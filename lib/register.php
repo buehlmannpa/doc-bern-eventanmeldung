@@ -123,8 +123,11 @@ function form_post_to_input(array $post): array
         'main'     => ['first' => $get('main_first'), 'last' => $get('main_last'), 'menu' => $get('main_menu')],
         'children' => [],
     ];
-    if ($get('companion_first') !== '' || $get('companion_last') !== '') {
-        $in['companion'] = ['first' => $get('companion_first'), 'last' => $get('companion_last'), 'menu' => $get('companion_menu')];
+    $in['companions'] = [];
+    foreach ($post as $k => $v) {
+        if (preg_match('/^(companion\d*)_first$/', (string) $k, $m)) {
+            $in['companions'][] = ['first' => $get($m[1] . '_first'), 'last' => $get($m[1] . '_last'), 'menu' => $get($m[1] . '_menu')];
+        }
     }
     foreach ($post as $k => $v) {
         if (preg_match('/^(child\d+)_first$/', (string) $k, $m)) {
@@ -147,7 +150,7 @@ function waitlist_attempt(array $in): array
     $first  = clean_text($in['first'] ?? '', 60);
     $last   = clean_text($in['last'] ?? '', 60);
     $email  = mb_strtolower(clean_text($in['email'] ?? '', 120));
-    $max    = (cfg('features.companion') || cfg('features.children')) ? 1 + (cfg('features.companion') ? 1 : 0) + (int) cfg('features.max_children', 8) : 1;
+    $max    = max_persons_per_registration();
     $people = max(1, min($max, (int) ($in['persons'] ?? 1)));
 
     if ($first === '') { $fields['wl_first'] = 'Bitte Vorname angeben.'; }

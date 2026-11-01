@@ -12,7 +12,7 @@ Läuft auf jedem Standard Webhosting mit PHP (z.B. Hostpoint), **ohne Datenbank 
 * Helles Design, automatisch dunkel gemäss Systemeinstellung des Geräts
 * Belegungsbalken mit Live Aktualisierung (alle 30 Sekunden)
 * Hauptperson mit Vor und Nachname sowie E-Mail
-* Optional eine weitere Person (ohne E-Mail) und beliebig viele Kinder
+* Optional weitere erwachsene Personen (ohne E-Mail, Anzahl einstellbar mit `max_companions`) und Kinder
 * Optional Menüwahl pro Person (Standard oder Alternativ)
 * Limit (Standard 80 Personen, Erwachsene und Kinder zählen je als 1 Platz). Wer mehr Personen anmelden will als Plätze frei sind, erhält sofort eine Meldung und kann nicht absenden. Der Server prüft das zusätzlich unter Sperre, damit auch gleichzeitige Anmeldungen nie überbuchen.
 * Automatisches Schliessen, sobald das Limit erreicht ist
