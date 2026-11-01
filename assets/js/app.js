@@ -108,21 +108,33 @@ window.addEventListener('error', (ev) => {
   const mainMenu = $('[data-menu-for="main"]');
   if (mainMenu) mainMenu.innerHTML = menuChoice('main', 'adult');
 
-  // Weitere Person (max. 1)
+  // Weitere erwachsene Personen (bis zur konfigurierten Obergrenze)
+  const maxCompanions = Number(f.max_companions_effective ?? f.max_companions ?? 5);
+  let companionSeq = 0;
   const addCompanion = $('#add-companion');
   const companionWrap = $('#companion-wrap');
   addCompanion?.addEventListener('click', () => {
-    const block = personBlock('companion', 'Weitere Person', 'Weitere Person entfernen');
+    const key = `companion${companionSeq++}`;
+    const block = personBlock(key, 'Weitere Person', 'Weitere Person entfernen');
+    block.classList.add('companion-block');
     block.querySelector('.remove').addEventListener('click', () => {
       block.remove();
-      addCompanion.hidden = false;
+      renumberCompanions();
       update();
     });
     companionWrap.appendChild(block);
-    addCompanion.hidden = true;
+    renumberCompanions();
     block.querySelector('input').focus();
     update();
   });
+
+  function renumberCompanions() {
+    const blocks = $$('.companion-block', companionWrap || document);
+    blocks.forEach((b, i) => {
+      b.querySelector('legend').textContent = blocks.length > 1 ? `Weitere Person ${i + 1}` : 'Weitere Person';
+    });
+    if (addCompanion) addCompanion.hidden = blocks.length >= maxCompanions;
+  }
 
   // Kinder
   const addChild = $('#add-child');
@@ -159,13 +171,15 @@ window.addEventListener('error', (ev) => {
     const data = {
       email: val('email'),
       main: { first: val('main.first'), last: val('main.last'), menu: menuVal('main') },
+      companions: [],
       children: [],
       consent: form.elements.consent.checked,
       website: val('website'),
     };
-    if ($('[data-key="companion"]')) {
-      data.companion = { first: val('companion.first'), last: val('companion.last'), menu: menuVal('companion') };
-    }
+    $$('.companion-block').forEach((b) => {
+      const k = b.dataset.key;
+      data.companions.push({ first: val(`${k}.first`), last: val(`${k}.last`), menu: menuVal(k), _key: k });
+    });
     $$('.child-block').forEach((b) => {
       const k = b.dataset.key;
       data.children.push({ first: val(`${k}.first`), last: val(`${k}.last`), menu: menuVal(k, 'child'), _key: k });
@@ -176,7 +190,7 @@ window.addEventListener('error', (ev) => {
   function update() {
     if (!form) return;
     const d = collect();
-    const adults = 1 + (d.companion ? 1 : 0);
+    const adults = 1 + d.companions.length;
     const kids = d.children.length;
     const total = adults + kids;
 
@@ -184,7 +198,7 @@ window.addEventListener('error', (ev) => {
     if (kids) html += `<span>${adults} Erw. und ${kids} ${kids === 1 ? 'Kind' : 'Kinder'}</span>`;
     if (f.payment) {
       const sum = menuPrice('adult', d.main.menu)
-        + (d.companion ? menuPrice('adult', d.companion.menu) : 0)
+        + d.companions.reduce((a, c) => a + menuPrice('adult', c.menu), 0)
         + d.children.reduce((a, c) => a + menuPrice('child', c.menu), 0);
       html += `<span>Total <strong>${chf(sum)}</strong></span>`;
     }
@@ -299,10 +313,10 @@ window.addEventListener('error', (ev) => {
   // Serverfehler (z.B. "children.0.first") auf Formularfelder abbilden
   function mapServerErrors(fields, data) {
     Object.entries(fields || {}).forEach(([key, msg]) => {
-      const m = key.match(/^children\.(\d+)\.(first|last)$/);
+      const m = key.match(/^(children|companions)\.(\d+)\.(first|last)$/);
       if (m) {
-        const child = data.children[Number(m[1])];
-        if (child) markField(`${child._key}.${m[2]}`, msg);
+        const item = data[m[1]][Number(m[2])];
+        if (item) markField(`${item._key}.${m[3]}`, msg);
       } else {
         markField(key, msg);
       }
