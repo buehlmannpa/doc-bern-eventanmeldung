@@ -115,7 +115,7 @@ try {
                 $row = [$nr, $date($r['created_at']), $p['first'], $p['last'], $p['relation'] === 'main' ? $r['email'] : '',
                         $relName[$p['relation']] ?? '', $roles[$p['role']]['label'] ?? ''];
                 if ($f['alt_menu']) { $row[] = menu_label($p['type'], $p['menu']) . (menu_valid($p['type'], $p['menu']) ? '' : ' (nicht gewählt)'); }
-                if ($f['payment'])  { $row[] = ['money' => price_for($p)]; $row[] = $paid ? 'ja' : 'nein'; }
+                if ($f['payment'])  { $row[] = ['money' => price_for($p)]; $row[] = person_is_free($p) ? 'gratis' : ($paid ? 'ja' : 'nein'); }
                 $row[] = $p['relation'] === 'main' ? ($r['notes'] ?? '') : '';
                 $pRows[]   = $row;
                 $pStyles[] = $p['role'] !== '' && isset($roles[$p['role']]) ? $p['role'] : null;
@@ -126,7 +126,7 @@ try {
 
             $main = $r['persons'][0];
             $row  = [$nr, $date($r['created_at']), $main['first'] . ' ' . $main['last'], $r['email'], count($r['persons']), $adults, $kids];
-            if ($f['payment']) { $row[] = ['money' => $total]; $row[] = $paid ? 'ja' : 'nein'; $row[] = $payName[registration_payment_state($r)]; }
+            if ($f['payment']) { $row[] = ['money' => $total]; $row[] = $total <= 0 ? 'gratis' : ($paid ? 'ja' : 'nein'); $row[] = $payName[registration_payment_state($r)]; }
             if (mail_enabled()) { $row[] = $date($r['mailed_at'] ?? ''); }
             $row[] = ($r['source'] ?? 'web') === 'admin' ? 'manuell' : 'Website';
             $row[] = $r['notes'] ?? '';
@@ -243,7 +243,7 @@ try {
                     $roles[$p['role']]['label'] ?? '',
                     menu_label($p['type'], $p['menu']),
                     number_format(price_for($p), 2, '.', ''),
-                    !empty($r['paid']) ? 'ja' : 'nein',
+                    person_is_free($p) ? 'gratis' : (!empty($r['paid']) ? 'ja' : 'nein'),
                     $p['relation'] === 'main' ? ($r['notes'] ?? '') : '',
                 ];
             }

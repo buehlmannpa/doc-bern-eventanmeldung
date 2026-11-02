@@ -164,7 +164,7 @@ function send_confirmation(array $reg): bool
         $files[] = ['filename' => $qr['filename'], 'mime' => $qr['mime'], 'content' => (string) file_get_contents($qr['file'])];
         $html = str_replace('{{QR}}', '<img src="cid:twintqr" width="180" height="180" alt="TWINT QR Code" style="display:block;margin:12px 0;border:0;">', $content['html']);
     } else {
-        $html = str_replace('{{QR}}', '', $content['html']);
+        $html = str_replace('{{QR}}', '<br>', $content['html']);
     }
     if (cfg('features.calendar', true)) {
         $files[] = ['filename' => ics_filename(), 'mime' => 'text/calendar; charset=UTF-8; method=PUBLISH', 'content' => build_ics()];
@@ -253,7 +253,7 @@ function confirmation_content(array $reg): array
             $line .= ', ' . $menuLbl($p);
         }
         if ($f['payment']) {
-            $line .= ', ' . format_chf(price_for($p));
+            $line .= ', ' . price_text($p);
         }
         $t[] = $line;
     }
@@ -274,6 +274,11 @@ function confirmation_content(array $reg): array
         foreach (cfg('program', []) as $p) {
             $t[] = $p['time'] . ': ' . $p['title'];
         }
+    }
+    if ($f['payment'] && $total <= 0) {
+        $t[] = '';
+        $t[] = 'Kosten: Gratis';
+        $t[] = 'Die Teilnahme ist für ' . (count($persons) > 1 ? 'euch' : 'dich') . ' kostenlos, eine Zahlung ist nicht nötig. Die Anmeldung ist damit definitiv.';
     }
     if ($f['payment'] && $total > 0) {
         $t[] = '';
@@ -309,12 +314,12 @@ function confirmation_content(array $reg): array
         $rows .= '<tr><td style="padding:8px 0;border-bottom:1px solid #eee;">' . e($p['first'] . ' ' . $p['last'])
             . ($p['type'] === 'child' ? ' <span style="color:#888;">(Kind)</span>' : '') . '</td>'
             . ($f['alt_menu'] ? '<td style="padding:8px 0 8px 12px;border-bottom:1px solid #eee;color:#555;">' . e($menuLbl($p)) . '</td>' : '')
-            . ($f['payment'] ? '<td style="padding:8px 0 8px 12px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;">' . e(format_chf(price_for($p))) . '</td>' : '')
+            . ($f['payment'] ? '<td style="padding:8px 0 8px 12px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;' . (person_is_free($p) ? 'color:#23935f;font-weight:bold;' : '') . '">' . e(price_text($p)) . '</td>' : '')
             . '</tr>';
     }
     if ($f['payment']) {
         $cols  = 1 + ($f['alt_menu'] ? 1 : 0);
-        $rows .= '<tr><td colspan="' . $cols . '" style="padding:10px 0;font-weight:bold;">Total</td><td style="padding:10px 0 10px 12px;text-align:right;font-weight:bold;white-space:nowrap;">' . e(format_chf($total)) . '</td></tr>';
+        $rows .= '<tr><td colspan="' . $cols . '" style="padding:10px 0;font-weight:bold;">Total</td><td style="padding:10px 0 10px 12px;text-align:right;font-weight:bold;white-space:nowrap;">' . e($total > 0 ? format_chf($total) : 'Gratis') . '</td></tr>';
     }
 
     $program = '';
@@ -326,6 +331,11 @@ function confirmation_content(array $reg): array
     }
 
     $pay = '';
+    if ($f['payment'] && $total <= 0) {
+        $pay = '<div style="margin:20px 0;padding:16px;border-radius:12px;background:#e8f5ee;color:#16583a;">'
+            . '<strong>Kosten: Gratis</strong><br>'
+            . 'Die Teilnahme ist für ' . (count($persons) > 1 ? 'euch' : 'dich') . ' kostenlos, eine Zahlung ist nicht nötig. Die Anmeldung ist damit definitiv.</div>';
+    }
     if ($f['payment'] && $total > 0) {
         $pay = '<div style="margin:20px 0;padding:16px;border-radius:12px;background:#f7f7f8;">'
             . '<strong>Zu bezahlen: ' . e(format_chf($total)) . '</strong><br>'
