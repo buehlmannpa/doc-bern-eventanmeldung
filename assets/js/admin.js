@@ -243,7 +243,7 @@
     }
     if (Object.keys(roles).length) {
       cards.push(['Personen nach Rolle', barList([
-        { label: groups ? 'Mitglieder und Gäste' : 'Mitglieder', value: persons.filter((p) => !p.role).length },
+        { label: 'Ohne Rolle', value: persons.filter((p) => !p.role).length },
         ...Object.entries(roles).map(([k, r]) => ({ label: r.label, value: persons.filter((p) => p.role === k).length, swatch: r.color })),
       ])]);
     }
@@ -366,7 +366,7 @@
       return `<li class="person ${role ? 'has-role' : ''}" ${role ? `style="--role:${esc(role.color)}"` : ''}>
         <span class="p-name">${esc(p.first)} ${esc(p.last)}</span>
         <span class="p-tags">${tagsFor(p, true)}</span>
-        ${f.payment ? `<span class="p-price">${chf(priceFor(p))}</span>` : ''}
+        ${f.payment ? (isFree(p) ? '<span class="p-price is-free">Gratis</span>' : `<span class="p-price">${chf(priceFor(p))}</span>`) : ''}
       </li>`;
     };
 
@@ -377,7 +377,8 @@
 
     const foot = [
       groups ? `<span>${r.persons.length} ${r.persons.length === 1 ? 'Person' : 'Personen'}</span>` : '',
-      f.payment ? `<strong>${chf(r.total)}</strong><label class="switch"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : '',
+      f.payment && r.total <= 0 ? '<strong class="is-free">Gratis</strong>' : '',
+      f.payment && r.total > 0 ? `<strong>${chf(r.total)}</strong><label class="switch"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paid ? 'checked' : ''}><span></span>Bezahlt</label>` : '',
       r.payState === 'overdue' ? '<p class="note note-overdue">Zahlung nach Anmeldeschluss nicht eingegangen. Platz freigeben (Anmeldung löschen) und der nächsten Person auf der Warteliste anbieten.</p>' : '',
       r.notes ? `<p class="note">${esc(r.notes)}</p>` : '',
     ].join('');
@@ -408,9 +409,13 @@
       </article>`;
   }
 
+  function isFree(p) {
+    return !!(p.role && roles[p.role]?.free);
+  }
+
   function priceFor(p) {
     if (!f.payment) return 0;
-    if (p.role && roles[p.role]?.free) return 0;
+    if (isFree(p)) return 0;
     return Number(menuOf(p).price) || 0;
   }
 

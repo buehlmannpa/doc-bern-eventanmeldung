@@ -120,6 +120,7 @@ return [
     'roles' => [
         'vorstand'      => ['label' => 'Vorstand',      'color' => '#3987e5', 'free' => true],
         'ehrenmitglied' => ['label' => 'Ehrenmitglied', 'color' => '#d4a017', 'free' => true],
+        'gast'          => ['label' => 'Eingeladener Gast', 'color' => '#23935f', 'free' => true],
     ],
 
     // ------------------------------------------------------------------
