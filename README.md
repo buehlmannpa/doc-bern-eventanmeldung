@@ -27,7 +27,7 @@ Läuft auf jedem Standard Webhosting mit PHP (z.B. Hostpoint), **ohne Datenbank 
 * Passwortgeschützt, Sperre nach 5 Fehlversuchen, CSRF Schutz
 * Übersicht mit Kennzahlen und Auswertungen (Belegung, Erwachsene und Kinder, Menüwahl, Rollen, Bezahlstatus, Anmeldungen pro Tag)
 * Anmeldungen ansehen, suchen, filtern, bearbeiten, löschen und manuell hinzufügen
-* Rollen pro Person (Vorstand, Ehrenmitglied) mit eigener Farbe, diese Personen bezahlen nichts
+* Rollen pro Person (Vorstand, Ehrenmitglied, Eingeladener Gast) mit eigener Farbe, diese Personen sind gratis und bezahlen nichts
 * Bezahlstatus pro Anmeldung
 * Anmeldung manuell schliessen («ausgebucht») oder pausieren («Wir sind gleich zurück»), mit eigenem Text
 * Limit im CMS übersteuerbar

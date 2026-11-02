@@ -499,11 +499,23 @@ function price_for(array $person): float
     if (!cfg('features.payment')) {
         return 0.0;
     }
-    $role = $person['role'] ?? '';
-    if ($role !== '' && cfg("roles.$role.free")) {
+    if (person_is_free($person)) {
         return 0.0;
     }
     return menu_price((string) ($person['type'] ?? 'adult'), $person['menu'] ?? '');
+}
+
+/** Person mit einer kostenlosen Rolle (z.B. Vorstand, Ehrenmitglied, eingeladener Gast) */
+function person_is_free(array $person): bool
+{
+    $role = $person['role'] ?? '';
+    return $role !== '' && (bool) cfg("roles.$role.free");
+}
+
+/** Preis einer Person als Text: «Gratis» bei kostenloser Rolle, sonst Betrag */
+function price_text(array $person): string
+{
+    return person_is_free($person) ? 'Gratis' : format_chf(price_for($person));
 }
 
 function registration_total(array $reg): float

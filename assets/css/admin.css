@@ -157,6 +157,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .p-name { font-weight: 600; overflow-wrap: anywhere; }
 .p-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .p-price { font-variant-numeric: tabular-nums; color: var(--text-2); min-width: 9ch; text-align: right; }
+.is-free, .p-price.is-free { color: var(--ok); font-weight: 650; }
 .tag-role { background: var(--role); color: #fff; border-color: transparent; font-weight: 650; text-shadow: 0 1px 1px rgba(0, 0, 0, .25); }
 .tag-alt { border-color: var(--notice-border); background: var(--notice-bg); color: var(--notice-text); }
 .tag-warn { border-color: var(--error-border); background: var(--error-bg); color: var(--error-text); font-weight: 650; }
@@ -164,6 +165,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .reg-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; color: var(--text-2); font-size: .92rem; }
 .reg-foot:empty { display: none; }
 .reg-foot strong { color: var(--text); }
+.reg-foot strong.is-free { color: var(--ok); }
 .note { flex-basis: 100%; margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--well); font-size: .88rem; }
 .note-overdue { background: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border); }
 
